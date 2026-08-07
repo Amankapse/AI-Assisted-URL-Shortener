@@ -1,7 +1,11 @@
 package com.example.urlshortener.common.exception;
 
+import com.example.urlshortener.common.correlation.CorrelationIdFilter;
+import com.example.urlshortener.common.ratelimit.RateLimitExceededException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +19,6 @@ import org.springframework.web.context.request.WebRequest;
 
 import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @ControllerAdvice
@@ -74,6 +77,18 @@ public class ProblemDetailExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(detail);
     }
 
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ProblemDetail> handleRateLimit(RateLimitExceededException ex, HttpServletRequest request) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, "Too many requests.");
+        detail.setTitle("Too Many Requests");
+        detail.setType(URI.create("https://example.com/problem/rate-limit-exceeded"));
+        detail.setProperty("errorCode", "rate_limit_exceeded");
+        detail.setProperty("correlationId", CorrelationIdFilter.current(request));
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.retryAfterSeconds()))
+                .body(detail);
+    }
+
     @ExceptionHandler({AuthenticationException.class, BadCredentialsException.class})
     public ResponseEntity<ProblemDetail> handleAuthentication(Exception ex, WebRequest request) {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Invalid email or password.");
@@ -95,9 +110,12 @@ public class ProblemDetailExceptionHandler {
 
     private String correlationId(WebRequest request) {
         String header = request.getHeader("X-Correlation-ID");
+        if (request instanceof org.springframework.web.context.request.ServletWebRequest servletWebRequest) {
+            return CorrelationIdFilter.current(servletWebRequest.getRequest());
+        }
         if (header != null && !header.isBlank()) {
             return header;
         }
-        return UUID.randomUUID().toString();
+        return "unavailable";
     }
 }

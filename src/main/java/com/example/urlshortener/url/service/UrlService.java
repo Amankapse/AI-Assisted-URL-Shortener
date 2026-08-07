@@ -2,6 +2,8 @@ package com.example.urlshortener.url.service;
 
 import com.example.urlshortener.common.exception.BadRequestException;
 import com.example.urlshortener.common.exception.ResourceNotFoundException;
+import com.example.urlshortener.common.metrics.AppMetrics;
+import com.example.urlshortener.common.ratelimit.RateLimiterService;
 import com.example.urlshortener.redirect.cache.RedirectCacheInvalidationEvent;
 import com.example.urlshortener.redirect.service.RedirectTarget;
 import com.example.urlshortener.url.dto.CreateShortUrlRequest;
@@ -31,42 +33,57 @@ public class UrlService {
     private final CurrentOwnerProvider currentOwnerProvider;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final RateLimiterService rateLimiter;
+    private final AppMetrics metrics;
 
     public UrlService(ShortUrlRepository shortUrlRepository,
                       UrlValidationService validationService,
                       ShortCodeGenerator shortCodeGenerator,
                       CurrentOwnerProvider currentOwnerProvider,
                       UserRepository userRepository,
-                      ApplicationEventPublisher eventPublisher) {
+                      ApplicationEventPublisher eventPublisher,
+                      RateLimiterService rateLimiter,
+                      AppMetrics metrics) {
         this.shortUrlRepository = shortUrlRepository;
         this.validationService = validationService;
         this.shortCodeGenerator = shortCodeGenerator;
         this.currentOwnerProvider = currentOwnerProvider;
         this.userRepository = userRepository;
         this.eventPublisher = eventPublisher;
+        this.rateLimiter = rateLimiter;
+        this.metrics = metrics;
     }
 
     @Transactional
     public ShortUrlResponse create(CreateShortUrlRequest request) {
-        validationService.validateOriginalUrl(request.getOriginalUrl());
-        validationService.validateCustomAlias(request.getCustomAlias());
-        validationService.validateExpiration(request.getCustomAlias(), request.getExpiresAt());
-
         OwnerIdentity identity = currentOwnerProvider.getCurrentOwner();
+        rateLimiter.enforce("url-create", identity.userId().toString());
         UserEntity owner = ownerReference(identity);
+        try {
+            validationService.validateOriginalUrl(request.getOriginalUrl());
+            validationService.validateCustomAlias(request.getCustomAlias());
+            validationService.validateExpiration(request.getCustomAlias(), request.getExpiresAt());
 
-        String shortCode = request.getCustomAlias();
-        if (shortCode != null && !shortCode.isBlank()) {
-            if (shortUrlRepository.existsByCustomAlias(shortCode) || shortUrlRepository.existsByShortCode(shortCode)) {
-                throw new BadRequestException("customAlias is already in use");
+            String shortCode = request.getCustomAlias();
+            if (shortCode != null && !shortCode.isBlank()) {
+                if (shortUrlRepository.existsByCustomAlias(shortCode) || shortUrlRepository.existsByShortCode(shortCode)) {
+                    throw new BadRequestException("customAlias is already in use");
+                }
+            } else {
+                shortCode = generateUniqueShortCode();
             }
-        } else {
-            shortCode = generateUniqueShortCode();
-        }
 
-        ShortUrlEntity entity = new ShortUrlEntity(UUID.randomUUID(), shortCode, request.getOriginalUrl(), request.getCustomAlias(), owner, request.getExpiresAt());
-        ShortUrlEntity saved = shortUrlRepository.save(entity);
-        return mapToResponse(saved);
+            ShortUrlEntity entity = new ShortUrlEntity(UUID.randomUUID(), shortCode, request.getOriginalUrl(), request.getCustomAlias(), owner, request.getExpiresAt());
+            ShortUrlEntity saved = shortUrlRepository.save(entity);
+            metrics.urlCreated();
+            return mapToResponse(saved);
+        } catch (BadRequestException ex) {
+            metrics.urlCreationFailed("customAlias is already in use".equals(ex.getMessage()) ? "alias_conflict" : "validation");
+            throw ex;
+        } catch (RuntimeException ex) {
+            metrics.urlCreationFailed("error");
+            throw ex;
+        }
     }
 
     @Transactional(readOnly = true)

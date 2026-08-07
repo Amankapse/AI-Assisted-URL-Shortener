@@ -2,6 +2,8 @@ package com.example.urlshortener.url.service;
 
 import com.example.urlshortener.common.exception.BadRequestException;
 import com.example.urlshortener.common.exception.ResourceNotFoundException;
+import com.example.urlshortener.common.metrics.AppMetrics;
+import com.example.urlshortener.common.ratelimit.RateLimiterService;
 import com.example.urlshortener.url.dto.CreateShortUrlRequest;
 import com.example.urlshortener.url.dto.UpdateShortUrlRequest;
 import com.example.urlshortener.url.entity.ShortUrlEntity;
@@ -42,6 +44,8 @@ class UrlServiceTests {
     private CurrentOwnerProvider ownerProvider;
     private UserRepository userRepository;
     private ApplicationEventPublisher eventPublisher;
+    private RateLimiterService rateLimiter;
+    private AppMetrics metrics;
     private UrlService urlService;
 
     @BeforeEach
@@ -52,7 +56,9 @@ class UrlServiceTests {
         ownerProvider = Mockito.mock(CurrentOwnerProvider.class);
         userRepository = Mockito.mock(UserRepository.class);
         eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
-        urlService = new UrlService(shortUrlRepository, validationService, shortCodeGenerator, ownerProvider, userRepository, eventPublisher);
+        rateLimiter = Mockito.mock(RateLimiterService.class);
+        metrics = Mockito.mock(AppMetrics.class);
+        urlService = new UrlService(shortUrlRepository, validationService, shortCodeGenerator, ownerProvider, userRepository, eventPublisher, rateLimiter, metrics);
     }
 
     @Test

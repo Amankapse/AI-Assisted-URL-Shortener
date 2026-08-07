@@ -12,7 +12,8 @@ The URL shortener is designed as a modular monolith with clear feature boundarie
 - Analytics Service: best-effort async click event capture, sanitized metadata, and per-link/admin analytics
 - Data layer: PostgreSQL for source-of-truth persistence
 - Cache layer: Redis for redirect optimization; PostgreSQL remains authoritative
-- Observability: Actuator health/readiness are present; broader Micrometer metrics remain future work
+- Observability: Actuator health/liveness/readiness, ADMIN-protected metrics, bounded Micrometer application meters, correlation IDs, and safe structured logging context
+- Rate limiting: Redis Lua fixed-window policies with documented fail-open/fail-closed behavior
 
 ## Data flow
 
@@ -35,6 +36,7 @@ The URL shortener is designed as a modular monolith with clear feature boundarie
 
 ## Operational flow
 
-- Health endpoints report application and database readiness for the current phase.
-- Redis readiness, redirect cache-hit metrics, auth failure metrics, and rate-limit telemetry remain future work.
+- Liveness reports JVM/application state and intentionally excludes PostgreSQL and Redis.
+- Readiness requires PostgreSQL because it is the source of truth and intentionally excludes Redis because redirect cache and selected limiter failures degrade without breaking correctness.
+- Redis cache, single-flight, analytics, authentication, and rate-limit telemetry are emitted through Micrometer with bounded tags only.
 - Soft deletion preserves historical analytics while making deleted links unavailable through normal owner and redirect queries.

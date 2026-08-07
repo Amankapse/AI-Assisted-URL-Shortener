@@ -1,5 +1,6 @@
 package com.example.urlshortener.security;
 
+import com.example.urlshortener.common.correlation.CorrelationIdFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,7 +12,6 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
-import java.util.UUID;
 
 @Component
 public class Rfc7807AuthenticationEntryPoint implements AuthenticationEntryPoint {
@@ -26,14 +26,10 @@ public class Rfc7807AuthenticationEntryPoint implements AuthenticationEntryPoint
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Authentication is required.");
         detail.setTitle("Unauthorized");
         detail.setType(URI.create("https://example.com/problem/unauthorized"));
-        detail.setProperty("correlationId", correlationId(request));
+        detail.setProperty("correlationId", CorrelationIdFilter.current(request));
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         objectMapper.writeValue(response.getOutputStream(), detail);
     }
 
-    private String correlationId(HttpServletRequest request) {
-        String header = request.getHeader("X-Correlation-ID");
-        return header == null || header.isBlank() ? UUID.randomUUID().toString() : header;
-    }
 }

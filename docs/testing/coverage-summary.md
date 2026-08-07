@@ -45,3 +45,18 @@ Additional covered areas:
 - Owner-scoped analytics endpoints, daily analytics grouping, cross-owner denial, admin overview/top-links authorization, and prevention of admin bypass on normal URL APIs.
 - Soft-delete behavior that preserves historical click events while excluding deleted links from normal owner and redirect queries.
 - Flyway V3 `click_events.correlation_id`, `short_urls.deleted`, and `idx_click_events_url_clicked_at` migration validation on PostgreSQL Testcontainers.
+
+## Phase 5 validation
+
+`.\mvnw.cmd clean verify` passed with 72 tests.
+
+Additional covered areas:
+
+- Redis Lua rate-limit rejection, independent-subject isolation, and fail-open/fail-closed behavior.
+- RFC7807 429 responses with generic content, correlation ID, and `Retry-After`.
+- Login limiter response does not disclose account existence.
+- Correlation IDs are generated for missing/invalid input, safe inbound IDs are propagated, and unsafe values are not returned.
+- Actuator health/liveness/readiness exposure and protected metrics/sensitive endpoints.
+- Liveness excludes PostgreSQL and Redis; readiness requires PostgreSQL and excludes Redis.
+- Security headers for content sniffing, frames, referrer policy, and local HSTS behavior.
+- Application metric counters increment and meters avoid sensitive high-cardinality tag keys.

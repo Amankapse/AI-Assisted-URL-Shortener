@@ -15,7 +15,7 @@ This assessment is designed to demonstrate disciplined AI-assisted engineering e
 
 ## Current status
 
-Phase 4 Redis caching and click analytics validation is complete:
+Phase 5 operational readiness validation is complete:
 
 - Requirement normalization
 - Non-functional requirements
@@ -28,10 +28,15 @@ Phase 4 Redis caching and click analytics validation is complete:
 - Production URL APIs remain free of owner-input request parameters
 - Redis cache-aside redirect resolution with bounded TTLs, jitter, safe fallback to PostgreSQL, after-commit invalidation, and in-process single-flight protection
 - Best-effort async click analytics with bounded queueing, sanitized IP/referrer/user-agent data, PostgreSQL event persistence, atomic aggregate updates, and owner/admin analytics APIs
+- Spring Boot Actuator health/liveness/readiness and ADMIN-protected metrics exposure
+- Micrometer application metrics for URL creation, redirects, Redis cache/single-flight, analytics, authentication, and rate limiting
+- Redis Lua fixed-window rate limiting with configuration-driven fail-open/fail-closed policies
+- Centralized `X-Correlation-ID` validation, MDC propagation, response headers, and Problem Details correlation
+- Security headers, production analytics pepper validation, bounded request/resource configuration, k6 performance scripts, and operations/security documentation
 
 ## Next step
 
-Phase 4 cache and analytics behavior is ready for review. Rate limiting, broader observability/metrics, retention jobs, and Phase 5 work remain future scope.
+Phase 5 is ready for review. Phase 6/final release work remains future scope until Phase 5 is reviewed and approved.
 
 ## Project structure
 
@@ -49,7 +54,7 @@ Read `AGENTS.md` first. Then review the requirements documents, ADRs, and execut
 
 ## Validation
 
-The current Phase 4 validation was completed with:
+Phase 5 validation commands:
 
 ```powershell
 .\mvnw.cmd clean verify
@@ -57,7 +62,7 @@ The current Phase 4 validation was completed with:
 docker compose config
 ```
 
-`clean verify` passed with 60 tests. Testcontainers started PostgreSQL 15 Alpine and Redis 7 Alpine for the Redis integration test. Flyway applied `V1__initial_schema.sql`, `V2__authentication_refresh_tokens.sql`, and `V3__click_analytics_indexes.sql`; Hibernate schema validation succeeded. `dependency:tree` confirmed `flyway-core:11.7.2`, `flyway-database-postgresql:11.7.2`, `spring-boot-starter-data-redis:3.5.0`, and Boot-managed Lettuce `6.5.5.RELEASE`. `docker compose config` passed with only the existing obsolete `version` warning.
+`clean verify` passed with 72 tests. PostgreSQL and Redis Testcontainers started successfully. Flyway validated and applied `V1__initial_schema.sql`, `V2__authentication_refresh_tokens.sql`, and `V3__click_analytics_indexes.sql`; Hibernate schema validation succeeded. `dependency:tree` confirmed compatible Spring Boot-managed Flyway, Actuator, Micrometer, Redis, and Testcontainers versions with no added rate-limiting library. `docker compose config` passed with only the existing obsolete `version` warning.
 
 Production/local JWT keys must be supplied through `APP_AUTH_PRIVATE_KEY_PEM` and `APP_AUTH_PUBLIC_KEY_PEM`. The `test` profile generates ephemeral RSA keys only for reproducible tests.
 Production/local analytics IP hashing should set `APP_ANALYTICS_IP_HASH_PEPPER`; raw IP addresses, full user agents, full referrers, cookies, headers, tokens, and owner data are not stored in click events or Redis cache values.

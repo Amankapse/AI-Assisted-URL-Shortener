@@ -3,6 +3,9 @@ package com.example.urlshortener.redirect.service;
 import com.example.urlshortener.analytics.service.ClickAnalyticsPublisher;
 import com.example.urlshortener.common.exception.BadRequestException;
 import com.example.urlshortener.common.exception.ResourceNotFoundException;
+import com.example.urlshortener.common.metrics.AppMetrics;
+import com.example.urlshortener.common.ratelimit.RateLimiterService;
+import com.example.urlshortener.common.web.ClientIpResolver;
 import com.example.urlshortener.redirect.cache.RedirectCacheService;
 import com.example.urlshortener.redirect.cache.SingleFlightRedirectLoader;
 import com.example.urlshortener.url.service.UrlService;
@@ -41,12 +44,19 @@ class RedirectServiceTests {
         singleFlightLoader = Mockito.mock(SingleFlightRedirectLoader.class);
         analyticsPublisher = Mockito.mock(ClickAnalyticsPublisher.class);
         request = Mockito.mock(HttpServletRequest.class);
+        RateLimiterService rateLimiter = Mockito.mock(RateLimiterService.class);
+        ClientIpResolver clientIpResolver = Mockito.mock(ClientIpResolver.class);
+        AppMetrics metrics = Mockito.mock(AppMetrics.class);
+        when(clientIpResolver.resolve(request)).thenReturn("127.0.0.1");
         redirectService = new RedirectService(
                 urlService,
                 cacheService,
                 singleFlightLoader,
                 analyticsPublisher,
-                Clock.fixed(java.time.Instant.parse("2026-08-07T00:00:00Z"), ZoneOffset.UTC)
+                Clock.fixed(java.time.Instant.parse("2026-08-07T00:00:00Z"), ZoneOffset.UTC),
+                rateLimiter,
+                clientIpResolver,
+                metrics
         );
     }
 

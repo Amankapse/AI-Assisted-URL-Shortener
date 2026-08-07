@@ -1,5 +1,6 @@
 package com.example.urlshortener.redirect.cache;
 
+import com.example.urlshortener.common.metrics.AppMetrics;
 import com.example.urlshortener.redirect.config.RedirectCacheProperties;
 import com.example.urlshortener.redirect.service.RedirectTarget;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,7 +40,8 @@ class RedirectCacheServiceTests {
                 redisTemplate,
                 new ObjectMapper().registerModule(new JavaTimeModule()),
                 properties,
-                Clock.fixed(Instant.parse("2026-08-07T00:00:00Z"), ZoneOffset.UTC)
+                Clock.fixed(Instant.parse("2026-08-07T00:00:00Z"), ZoneOffset.UTC),
+                mock(AppMetrics.class)
         );
     }
 

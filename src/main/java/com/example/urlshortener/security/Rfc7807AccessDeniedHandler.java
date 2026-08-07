@@ -1,5 +1,6 @@
 package com.example.urlshortener.security;
 
+import com.example.urlshortener.common.correlation.CorrelationIdFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,7 +12,6 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
-import java.util.UUID;
 
 @Component
 public class Rfc7807AccessDeniedHandler implements AccessDeniedHandler {
@@ -26,14 +26,10 @@ public class Rfc7807AccessDeniedHandler implements AccessDeniedHandler {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "Access is denied.");
         detail.setTitle("Forbidden");
         detail.setType(URI.create("https://example.com/problem/forbidden"));
-        detail.setProperty("correlationId", correlationId(request));
+        detail.setProperty("correlationId", CorrelationIdFilter.current(request));
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         objectMapper.writeValue(response.getOutputStream(), detail);
     }
 
-    private String correlationId(HttpServletRequest request) {
-        String header = request.getHeader("X-Correlation-ID");
-        return header == null || header.isBlank() ? UUID.randomUUID().toString() : header;
-    }
 }

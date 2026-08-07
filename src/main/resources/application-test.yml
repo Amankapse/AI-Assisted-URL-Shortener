@@ -22,3 +22,31 @@ app:
   redirect:
     cache:
       enabled: false
+  rate-limit:
+    enabled: true
+    key-salt: test-rate-limit-salt
+    policies:
+      registration:
+        limit: 1000
+        window: 1m
+        fail-open: true
+      login:
+        limit: 1000
+        window: 1m
+        fail-open: true
+      refresh:
+        limit: 1000
+        window: 1m
+        fail-open: true
+      url-create:
+        limit: 1000
+        window: 1m
+        fail-open: true
+      redirect:
+        limit: 1000
+        window: 1m
+        fail-open: true
+      admin-analytics:
+        limit: 1000
+        window: 1m
+        fail-open: true

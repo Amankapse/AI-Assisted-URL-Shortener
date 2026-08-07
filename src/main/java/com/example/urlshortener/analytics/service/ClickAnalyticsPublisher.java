@@ -1,7 +1,9 @@
 package com.example.urlshortener.analytics.service;
 
 import com.example.urlshortener.analytics.config.AnalyticsProperties;
+import com.example.urlshortener.common.metrics.AppMetrics;
 import com.example.urlshortener.redirect.service.RedirectTarget;
+import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PreDestroy;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -30,6 +32,7 @@ public class ClickAnalyticsPublisher implements SmartLifecycle {
     private final ClickAnalyticsWriter writer;
     private final AnalyticsCounters counters;
     private final Clock clock;
+    private final AppMetrics metrics;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private Thread worker;
 
@@ -37,12 +40,14 @@ public class ClickAnalyticsPublisher implements SmartLifecycle {
                                    ClickPrivacySanitizer sanitizer,
                                    ClickAnalyticsWriter writer,
                                    AnalyticsCounters counters,
-                                   Clock clock) {
+                                   Clock clock,
+                                   AppMetrics metrics) {
         this.properties = properties;
         this.sanitizer = sanitizer;
         this.writer = writer;
         this.counters = counters;
         this.clock = clock;
+        this.metrics = metrics;
         this.queue = new ArrayBlockingQueue<>(properties.getQueueCapacity());
     }
 
@@ -139,7 +144,9 @@ public class ClickAnalyticsPublisher implements SmartLifecycle {
         int attempts = 0;
         while (true) {
             try {
+                Timer.Sample sample = metrics.startTimer();
                 int persisted = writer.persistBatch(batch);
+                metrics.recordAnalyticsBatch(sample, batch.size());
                 counters.persisted(persisted);
                 return;
             } catch (TransientDataAccessException ex) {

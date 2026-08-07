@@ -20,6 +20,7 @@ This document records the major prompts used during AI-assisted planning and imp
 | P-014 | Phase 2 end-to-end validation | Expand Phase 2 tests across repositories, services, controllers, redirects, OpenAPI, pagination, collisions, and RFC7807 errors | Added regression coverage and fixed defects found after Flyway/Testcontainers startup | Accepted |
 | P-015 | Phase 3 authentication | Implement approved authentication, authorization, and secure ownership refinements without Redis/rate limiting/observability/admin expansion | Added Spring Security resource server, RS256 JWT, refresh-token rotation, CSRF refresh/logout, secure current-owner provider, V2 refresh-token migration, tests, and docs | Accepted |
 | P-016 | Phase 4 Redis and analytics | Implement approved Redis cache-aside and click analytics refinements without Phase 5 work | Added Redis redirect cache, single-flight miss protection, async sanitized analytics, V3 migration, owner/admin analytics endpoints, tests, and docs | Accepted |
+| P-017 | Phase 5 operational readiness | Implement approved observability, Redis Lua rate limiting, health/readiness, security hardening, k6 scripts, and operations documentation without new business features | Added bounded Micrometer metrics, correlation IDs, protected Actuator metrics, Redis Lua limiter policies, security headers, production analytics pepper validation, k6 scripts, tests, and docs | Accepted |
 
 ## P-013 Validation Notes
 
@@ -87,6 +88,44 @@ This document records the major prompts used during AI-assisted planning and imp
   - Hibernate schema validation succeeded against PostgreSQL 15.18.
   - `.\mvnw.cmd dependency:tree` passed and confirmed `flyway-core:11.7.2`, `flyway-database-postgresql:11.7.2`, `spring-boot-starter-data-redis:3.5.0`, Lettuce `6.5.5.RELEASE`, and no direct Jedis dependency.
   - `docker compose config` passed with only the existing obsolete `version` attribute warning.
+
+## P-017 Validation Notes
+
+- Scope: Phase 5 operational readiness only. No Phase 6 work, new business features, authentication redesign, Redis cache redesign, analytics redesign, migration change, or new production dependency was introduced.
+- Approved correction/design:
+  - Used the existing `StringRedisTemplate` with an atomic Redis Lua fixed-window script.
+  - Added configuration-driven limiter policies for registration, login, refresh, URL creation, public redirect, and admin analytics.
+  - Kept login/register/refresh fail-closed, public redirect fail-open, and URL/admin limiters fail-open as documented.
+  - Protected `/actuator/metrics` behind `ROLE_ADMIN`; exposed only health, liveness, readiness, info, and metrics at management exposure level.
+  - Centralized `X-Correlation-ID` validation in a servlet filter and reused the same ID in Problem Details.
+- Defects and refinements found during Phase 5:
+  - Root health/readiness initially became 503 when Redis was unavailable because Redis health was still part of aggregate health status; fixed by excluding Redis health and documenting Redis degradation through metrics/logs.
+  - URL creation alias conflicts initially double-counted failure metrics as both alias conflict and validation; fixed to record a single bounded reason.
+  - A Redis Testcontainers integration test left the Lettuce client active until container shutdown; added explicit client cleanup.
+- Validation:
+  - `.\mvnw.cmd clean verify` passed with 72 tests.
+  - PostgreSQL Testcontainers started successfully using Docker Desktop over the local npipe strategy.
+  - Redis Testcontainers started successfully for cache and rate-limit integration validation.
+  - Flyway validated 3 migrations and applied V1, V2, and V3.
+  - Hibernate schema validation succeeded against PostgreSQL 15.18.
+  - `.\mvnw.cmd dependency:tree` passed and confirmed `flyway-core:11.7.2`, `flyway-database-postgresql:11.7.2`, Spring Boot Actuator `3.5.0`, Micrometer `1.15.0`, `spring-boot-starter-data-redis:3.5.0`, Lettuce `6.5.5.RELEASE`, and no added rate-limiting library.
+  - `docker compose config` passed with only the existing obsolete `version` attribute warning.
+  - k6 was not executed because it is not installed in this environment.
+  - `scripts/verify.sh` was attempted but failed before Maven startup because Bash did not have `JAVA_HOME` configured; the equivalent Windows validation commands passed.
+
+## P-017 AI Output Examples
+
+### Accepted
+
+AI-generated Redis Lua fixed-window limiting through `StringRedisTemplate` was accepted because it met the no-new-dependency requirement and keeps Redis operations atomic.
+
+### Edited
+
+AI-generated URL creation metrics initially counted a custom-alias conflict twice. The implementation was edited to emit only `reason=alias_conflict`.
+
+### Rejected
+
+Treating Redis health as part of readiness was rejected after tests showed Redis outage made health probes fail. Redis is not required for correctness because PostgreSQL fallback exists, so Redis was removed from Actuator health readiness and is tracked through degradation metrics instead.
 
 ## AI was wrong example
 

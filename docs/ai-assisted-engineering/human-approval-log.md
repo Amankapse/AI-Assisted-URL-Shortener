@@ -31,3 +31,11 @@ This log records explicit approvals for decisions that affect architecture, secu
 - Approved adding `V3__click_analytics_indexes.sql`; `V1__initial_schema.sql` and `V2__authentication_refresh_tokens.sql` were not modified.
 - Explicitly deferred rate limiting, broad observability expansion, retention jobs, and Phase 5 work.
 - Validation: `.\mvnw.cmd clean verify` passed with 60 tests; `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed with only the existing obsolete-version warning.
+
+## Phase 5 Operational Readiness
+- Approved Phase 5 scope: observability, rate limiting, health/readiness, performance scripts, security hardening, runbooks, failure-mode validation, and final quality gates only.
+- Approved Redis Lua rate limiting with the existing `StringRedisTemplate`; no new production dependency was authorized or added.
+- Approved protected Actuator metrics exposure, public health/liveness/readiness probes, liveness excluding PostgreSQL/Redis, readiness requiring PostgreSQL and excluding Redis.
+- Approved centralized correlation ID filter with strict safe input validation and MDC cleanup.
+- Approved no Flyway migration for Phase 5 unless a genuine schema requirement was discovered; no migration was required.
+- Validation: `.\mvnw.cmd clean verify` passed with 72 tests; `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed with only the existing obsolete-version warning. `scripts/verify.sh` was attempted but failed before Maven startup because Bash did not have `JAVA_HOME` configured.

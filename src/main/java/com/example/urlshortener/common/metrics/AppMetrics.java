@@ -1,0 +1,74 @@
+package com.example.urlshortener.common.metrics;
+
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import org.springframework.stereotype.Component;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+@Component
+public class AppMetrics {
+    private final MeterRegistry registry;
+    private final ConcurrentMap<String, Counter> counters = new ConcurrentHashMap<>();
+    private final Timer analyticsBatchTimer;
+    private final DistributionSummary analyticsBatchSize;
+
+    public AppMetrics(MeterRegistry registry) {
+        this.registry = registry;
+        this.analyticsBatchTimer = Timer.builder("url_shortener.analytics.batch.persistence")
+                .description("Analytics batch persistence latency")
+                .register(registry);
+        this.analyticsBatchSize = DistributionSummary.builder("url_shortener.analytics.batch.size")
+                .description("Analytics batch size")
+                .baseUnit("events")
+                .register(registry);
+    }
+
+    public void urlCreated() {
+        increment("url_shortener.urls", "operation", "create", "outcome", "success");
+    }
+
+    public void urlCreationFailed(String reason) {
+        increment("url_shortener.urls", "operation", "create", "outcome", "failure", "reason", reason);
+    }
+
+    public void redirect(String outcome) {
+        increment("url_shortener.redirects", "outcome", outcome);
+    }
+
+    public void cache(String operation, String outcome) {
+        increment("url_shortener.redis.cache", "operation", operation, "outcome", outcome);
+    }
+
+    public void singleFlight(String outcome) {
+        increment("url_shortener.redis.singleflight", "outcome", outcome);
+    }
+
+    public void auth(String operation, String outcome) {
+        increment("url_shortener.auth", "operation", operation, "outcome", outcome);
+    }
+
+    public void rateLimit(String limiter, String outcome) {
+        increment("url_shortener.rate_limit", "limiter", limiter, "outcome", outcome);
+    }
+
+    public Timer.Sample startTimer() {
+        return Timer.start(registry);
+    }
+
+    public void recordAnalyticsBatch(Timer.Sample sample, int size) {
+        analyticsBatchSize.record(size);
+        sample.stop(analyticsBatchTimer);
+    }
+
+    private void increment(String name, String... tags) {
+        counters.computeIfAbsent(key(name, tags), ignored -> Counter.builder(name).tags(tags).register(registry)).increment();
+    }
+
+    private String key(String name, String[] tags) {
+        return name + "|" + String.join("|", tags);
+    }
+}
