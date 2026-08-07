@@ -21,6 +21,7 @@ This document records the major prompts used during AI-assisted planning and imp
 | P-015 | Phase 3 authentication | Implement approved authentication, authorization, and secure ownership refinements without Redis/rate limiting/observability/admin expansion | Added Spring Security resource server, RS256 JWT, refresh-token rotation, CSRF refresh/logout, secure current-owner provider, V2 refresh-token migration, tests, and docs | Accepted |
 | P-016 | Phase 4 Redis and analytics | Implement approved Redis cache-aside and click analytics refinements without Phase 5 work | Added Redis redirect cache, single-flight miss protection, async sanitized analytics, V3 migration, owner/admin analytics endpoints, tests, and docs | Accepted |
 | P-017 | Phase 5 operational readiness | Implement approved observability, Redis Lua rate limiting, health/readiness, security hardening, k6 scripts, and operations documentation without new business features | Added bounded Micrometer metrics, correlation IDs, protected Actuator metrics, Redis Lua limiter policies, security headers, production analytics pepper validation, k6 scripts, tests, and docs | Accepted |
+| P-018 | Phase 6 release readiness | Finalize CI/CD, quality evidence, documentation, dependency/secret audit, coverage, and submission summary without product changes | Added JaCoCo reporting, expanded GitHub Actions, removed obsolete Compose version, rewrote README, added final engineering summary and release checklist, updated traceability | Edited |
 
 ## P-013 Validation Notes
 
@@ -126,6 +127,41 @@ AI-generated URL creation metrics initially counted a custom-alias conflict twic
 ### Rejected
 
 Treating Redis health as part of readiness was rejected after tests showed Redis outage made health probes fail. Redis is not required for correctness because PostgreSQL fallback exists, so Redis was removed from Actuator health readiness and is tracked through degradation metrics instead.
+
+## P-018 Validation Notes
+
+- Scope: final release readiness only. No product feature, migration, authentication redesign, microservice split, Kafka, or new infrastructure was introduced.
+- Release gaps addressed:
+  - Added JaCoCo Maven plugin and generated coverage evidence.
+  - Expanded GitHub Actions workflow for Java 21, Docker availability, Maven verify, Compose validation, and artifact upload.
+  - Removed obsolete top-level Compose `version`.
+  - Rewrote README for final reviewer evaluation.
+  - Added final engineering summary, release readiness checklist, and test quality review.
+  - Sanitized `.env.example` secret-bearing values into placeholders.
+  - Removed redundant Testcontainers BOM/property so Spring Boot dependency management is authoritative.
+- Validation:
+  - `.\mvnw.cmd clean verify` passed with 72 tests.
+  - JaCoCo generated line coverage 85.08% and branch coverage 64.46%.
+  - PostgreSQL and Redis Testcontainers started successfully.
+  - Flyway validated and applied V1, V2, and V3.
+  - Hibernate schema validation succeeded.
+  - `.\mvnw.cmd dependency:tree` passed and confirmed no direct Jedis dependency and no rate-limiting library.
+  - `docker compose config` passed without warnings.
+  - k6 was not executed because it is not installed.
+
+## P-018 AI Output Examples
+
+### Accepted
+
+AI-generated final README structure was accepted because it presents the project summary, architecture, quick start, validation, security, AI traceability, and limitations in reviewer-friendly form.
+
+### Edited
+
+AI initially left `.env.example` with local concrete secret-bearing values. The file was edited to use placeholders for database password, RSA key material, analytics pepper, and rate-limit key salt.
+
+### Rejected
+
+Adding heavy late-stage SAST/SCA tooling was rejected because it would introduce new build risk at the final phase without prior approval. The final submission records manual secret/dependency checks and leaves formal SAST/SCA as production evolution.
 
 ## AI was wrong example
 

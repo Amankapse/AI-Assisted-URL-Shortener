@@ -31,6 +31,15 @@ Access tokens are RS256 JWTs with `sub` as the internal user UUID plus `email`, 
 
 Admin analytics endpoints do not grant `ADMIN` bypass access to normal user URL APIs.
 
+## Operational endpoints
+
+- `GET /actuator/health`: public health endpoint for platform checks.
+- `GET /actuator/health/liveness`: public JVM/application liveness probe; does not depend on PostgreSQL or Redis.
+- `GET /actuator/health/readiness`: public readiness probe; requires PostgreSQL and intentionally excludes Redis.
+- `GET /actuator/metrics`: exposed but protected by `ROLE_ADMIN`.
+
+Sensitive Actuator endpoints such as `env`, `configprops`, `heapdump`, `threaddump`, `beans`, `mappings`, `loggers`, and `conditions` are not exposed.
+
 ## Ownership
 
 Authenticated URL management uses `SecurityCurrentOwnerProvider` to build `OwnerIdentity(UUID userId, String email, UserRole role)` from the JWT principal. URL services scope repository queries by `sub` UUID. Request DTOs and controller parameters do not accept owner IDs, emails, or user IDs from clients, and `ADMIN` does not bypass ownership on user URL endpoints.
@@ -47,4 +56,4 @@ Bearer-token URL APIs are stateless and do not require CSRF tokens. Refresh and 
 
 ## Error responses
 
-Validation, malformed JSON, bad requests, not-found, unauthorized, and forbidden responses use RFC7807-style `application/problem+json` responses. Global application errors include a `correlationId` property; security entry-point responses return safe problem details without stack traces.
+Validation, malformed JSON, bad requests, not-found, unauthorized, forbidden, and rate-limit responses use RFC7807-style `application/problem+json` responses. Global application errors include a `correlationId` property; security entry-point responses return safe problem details without stack traces. Rate-limit responses use HTTP 429 with error code `rate_limit_exceeded` and include `Retry-After` when available.

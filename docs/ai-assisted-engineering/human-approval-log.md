@@ -39,3 +39,9 @@ This log records explicit approvals for decisions that affect architecture, secu
 - Approved centralized correlation ID filter with strict safe input validation and MDC cleanup.
 - Approved no Flyway migration for Phase 5 unless a genuine schema requirement was discovered; no migration was required.
 - Validation: `.\mvnw.cmd clean verify` passed with 72 tests; `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed with only the existing obsolete-version warning. `scripts/verify.sh` was attempted but failed before Maven startup because Bash did not have `JAVA_HOME` configured.
+
+## Phase 6 Final Release Readiness
+- Approved final phase scope: release readiness, CI/CD, quality evidence, documentation, and submission preparation only.
+- Approved adding JaCoCo Maven plugin as normal build-tooling evidence; no production dependency was added.
+- Approved no new product features, no architecture redesign, no microservices, no Kafka, no new authentication mechanism, and no additional infrastructure.
+- Validation: `.\mvnw.cmd clean verify` passed with 72 tests and generated JaCoCo coverage; `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed without warnings; k6 was unavailable and not installed automatically.
