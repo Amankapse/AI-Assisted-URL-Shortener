@@ -1,5 +1,6 @@
 package com.example.urlshortener.redirect.cache;
 
+import com.example.urlshortener.common.metrics.AppMetrics;
 import com.example.urlshortener.redirect.config.RedirectCacheProperties;
 import com.example.urlshortener.redirect.service.RedirectTarget;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,15 +27,18 @@ public class RedirectCacheService {
     private final ObjectMapper objectMapper;
     private final RedirectCacheProperties properties;
     private final Clock clock;
+    private final AppMetrics metrics;
 
     public RedirectCacheService(StringRedisTemplate redisTemplate,
                                 ObjectMapper objectMapper,
                                 RedirectCacheProperties properties,
-                                Clock clock) {
+                                Clock clock,
+                                AppMetrics metrics) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.properties = properties;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     public Optional<RedirectTarget> get(String shortCode) {
@@ -45,20 +49,25 @@ public class RedirectCacheService {
         try {
             String value = redisTemplate.opsForValue().get(key);
             if (value == null || value.isBlank()) {
+                metrics.cache("lookup", "miss");
                 return Optional.empty();
             }
             RedirectCacheEntry entry = objectMapper.readValue(value, RedirectCacheEntry.class);
             if (!isUsable(entry)) {
                 evict(shortCode);
+                metrics.cache("lookup", "miss");
                 return Optional.empty();
             }
+            metrics.cache("lookup", "hit");
             return Optional.of(entry.toTarget());
         } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
             log.warn("Malformed redirect cache entry for key {}", key);
             evict(shortCode);
+            metrics.cache("lookup", "failure");
             return Optional.empty();
         } catch (RedisConnectionFailureException | RedisSystemException | QueryTimeoutException ex) {
             log.warn("Redis read failed for redirect cache key {}", key);
+            metrics.cache("lookup", "failure");
             return Optional.empty();
         }
     }
@@ -73,10 +82,13 @@ public class RedirectCacheService {
         }
         try {
             redisTemplate.opsForValue().set(key(target.shortCode()), objectMapper.writeValueAsString(RedirectCacheEntry.fromTarget(target)), ttl);
+            metrics.cache("write", "success");
         } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
             log.warn("Unable to serialize redirect cache entry for short code {}", target.shortCode());
+            metrics.cache("write", "failure");
         } catch (RedisConnectionFailureException | RedisSystemException | QueryTimeoutException ex) {
             log.warn("Redis write failed for redirect cache key {}", key(target.shortCode()));
+            metrics.cache("write", "failure");
         }
     }
 
@@ -86,8 +98,10 @@ public class RedirectCacheService {
         }
         try {
             redisTemplate.delete(key(shortCode));
+            metrics.cache("invalidation", "success");
         } catch (RedisConnectionFailureException | RedisSystemException | QueryTimeoutException ex) {
             log.warn("Redis eviction failed for redirect cache key {}", key(shortCode));
+            metrics.cache("invalidation", "failure");
         }
     }
 
@@ -96,7 +110,7 @@ public class RedirectCacheService {
     }
 
     public Duration ttlFor(RedirectTarget target) {
-        Duration base = target.enabled() && !target.deleted() ? properties.getTtl() : properties.getIneligibleTtl();
+        Duration base = target.enabled() && !target.deleted() && !target.blocked() ? properties.getTtl() : properties.getIneligibleTtl();
         if (target.expiresAt() != null) {
             Duration remaining = Duration.between(LocalDateTime.now(clock), target.expiresAt());
             if (remaining.compareTo(base) < 0) {

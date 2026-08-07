@@ -1,5 +1,6 @@
 package com.example.urlshortener.redirect.cache;
 
+import com.example.urlshortener.common.metrics.AppMetrics;
 import com.example.urlshortener.redirect.config.RedirectCacheProperties;
 import com.example.urlshortener.redirect.service.RedirectTarget;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,7 @@ class SingleFlightRedirectLoaderTests {
     void concurrentMissShouldUseSingleLeaderAndCleanup() throws Exception {
         RedirectCacheProperties properties = new RedirectCacheProperties();
         properties.setSingleFlightTimeout(Duration.ofSeconds(2));
-        SingleFlightRedirectLoader loader = new SingleFlightRedirectLoader(properties);
+        SingleFlightRedirectLoader loader = new SingleFlightRedirectLoader(properties, org.mockito.Mockito.mock(AppMetrics.class));
         AtomicInteger loads = new AtomicInteger();
         CountDownLatch started = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -51,7 +52,7 @@ class SingleFlightRedirectLoaderTests {
         RedirectCacheProperties properties = new RedirectCacheProperties();
         properties.setSingleFlightTimeout(Duration.ofMillis(1));
         properties.setSingleFlightCapacity(0);
-        SingleFlightRedirectLoader capacityLoader = new SingleFlightRedirectLoader(properties);
+        SingleFlightRedirectLoader capacityLoader = new SingleFlightRedirectLoader(properties, org.mockito.Mockito.mock(AppMetrics.class));
         RedirectTarget fallback = target();
 
         assertThat(capacityLoader.load("abc1234", () -> {
@@ -60,7 +61,7 @@ class SingleFlightRedirectLoaderTests {
         assertThat(capacityLoader.inFlightSize()).isZero();
 
         properties.setSingleFlightCapacity(10);
-        SingleFlightRedirectLoader failureLoader = new SingleFlightRedirectLoader(properties);
+        SingleFlightRedirectLoader failureLoader = new SingleFlightRedirectLoader(properties, org.mockito.Mockito.mock(AppMetrics.class));
         assertThatThrownBy(() -> failureLoader.load("abc1234", () -> {
             throw new IllegalStateException("load failed");
         }, () -> fallback)).isInstanceOf(IllegalStateException.class);
@@ -71,7 +72,7 @@ class SingleFlightRedirectLoaderTests {
     void followerTimeoutShouldFallbackWithoutRemovingLeaderFuture() throws Exception {
         RedirectCacheProperties properties = new RedirectCacheProperties();
         properties.setSingleFlightTimeout(Duration.ofMillis(1));
-        SingleFlightRedirectLoader loader = new SingleFlightRedirectLoader(properties);
+        SingleFlightRedirectLoader loader = new SingleFlightRedirectLoader(properties, org.mockito.Mockito.mock(AppMetrics.class));
         CountDownLatch started = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         RedirectTarget leaderTarget = target();

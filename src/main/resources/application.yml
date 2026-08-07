@@ -4,6 +4,9 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/shortener}
     username: ${SPRING_DATASOURCE_USERNAME:shortener}
     password: ${SPRING_DATASOURCE_PASSWORD:shortener}
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:10}
+      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:30000}
   jpa:
     hibernate:
       ddl-auto: none
@@ -20,13 +23,33 @@ spring:
       repositories:
         enabled: false
 management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
+  health:
+    redis:
+      enabled: false
   endpoint:
     health:
       show-details: never
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState,ping
+        readiness:
+          include: readinessState,db
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+server:
+  tomcat:
+    max-http-form-post-size: ${SERVER_MAX_HTTP_FORM_POST_SIZE:2MB}
+    max-swallow-size: ${SERVER_MAX_SWALLOW_SIZE:2MB}
 app:
   auth:
     issuer: ${APP_AUTH_ISSUER:url-shortener}
@@ -55,3 +78,41 @@ app:
     shutdown-flush-timeout: ${APP_ANALYTICS_SHUTDOWN_FLUSH_TIMEOUT:5s}
     retry-count: ${APP_ANALYTICS_RETRY_COUNT:2}
     top-links-max: ${APP_ANALYTICS_TOP_LINKS_MAX:25}
+  rate-limit:
+    enabled: ${APP_RATE_LIMIT_ENABLED:true}
+    key-salt: ${APP_RATE_LIMIT_KEY_SALT:local-development-rate-limit-salt}
+    redis-timeout: ${APP_RATE_LIMIT_REDIS_TIMEOUT:250ms}
+    policies:
+      registration:
+        limit: ${APP_RATE_LIMIT_REGISTRATION_LIMIT:5}
+        window: ${APP_RATE_LIMIT_REGISTRATION_WINDOW:1m}
+        fail-open: false
+      login:
+        limit: ${APP_RATE_LIMIT_LOGIN_LIMIT:5}
+        window: ${APP_RATE_LIMIT_LOGIN_WINDOW:1m}
+        fail-open: false
+      refresh:
+        limit: ${APP_RATE_LIMIT_REFRESH_LIMIT:30}
+        window: ${APP_RATE_LIMIT_REFRESH_WINDOW:1m}
+        fail-open: false
+      url-create:
+        limit: ${APP_RATE_LIMIT_URL_CREATE_LIMIT:60}
+        window: ${APP_RATE_LIMIT_URL_CREATE_WINDOW:1m}
+        fail-open: true
+      redirect:
+        limit: ${APP_RATE_LIMIT_REDIRECT_LIMIT:600}
+        window: ${APP_RATE_LIMIT_REDIRECT_WINDOW:1m}
+        fail-open: true
+      admin-analytics:
+        limit: ${APP_RATE_LIMIT_ADMIN_ANALYTICS_LIMIT:120}
+        window: ${APP_RATE_LIMIT_ADMIN_ANALYTICS_WINDOW:1m}
+        fail-open: true
+shortener:
+  code:
+    length: ${SHORTENER_CODE_LENGTH:8}
+    max-retries: ${SHORTENER_CODE_MAX_RETRIES:5}
+  quota:
+    enabled: ${SHORTENER_QUOTA_ENABLED:true}
+    daily-creations-per-user: ${SHORTENER_QUOTA_DAILY_CREATIONS_PER_USER:10000}
+    max-active-links-per-user: ${SHORTENER_QUOTA_MAX_ACTIVE_LINKS_PER_USER:100000}
+    daily-custom-aliases-per-user: ${SHORTENER_QUOTA_DAILY_CUSTOM_ALIASES_PER_USER:1000}

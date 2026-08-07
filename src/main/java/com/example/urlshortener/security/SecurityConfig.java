@@ -18,6 +18,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -32,7 +33,8 @@ public class SecurityConfig {
                                             Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter,
                                             Rfc7807AuthenticationEntryPoint authenticationEntryPoint,
                                             Rfc7807AccessDeniedHandler accessDeniedHandler,
-                                            CsrfCookieFilter csrfCookieFilter) throws Exception {
+                                            CsrfCookieFilter csrfCookieFilter,
+                                            AuthProperties authProperties) throws Exception {
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfTokenRepository.setCookieName("XSRF-TOKEN");
         csrfTokenRepository.setHeaderName("X-XSRF-TOKEN");
@@ -53,7 +55,11 @@ public class SecurityConfig {
                 .headers(headers -> headers
                         .contentTypeOptions(Customizer.withDefaults())
                         .frameOptions(frame -> frame.deny())
-                        .httpStrictTransportSecurity(Customizer.withDefaults()))
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .requestMatcher(request -> authProperties.isSecureCookies())
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(31536000)))
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
@@ -63,8 +69,10 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/r/{shortCode}", "/actuator/health", "/actuator/info", "/v3/api-docs", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/r/{shortCode}", "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness", "/actuator/info", "/v3/api-docs", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/actuator/metrics", "/actuator/metrics/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/analytics/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/urls/{id}/block", "/api/v1/admin/urls/{id}/unblock").hasRole("ADMIN")
                         .requestMatchers("/api/v1/auth/me", "/api/v1/urls/**").hasRole("USER")
                         .anyRequest().denyAll());
         return http.build();

@@ -1,5 +1,6 @@
 package com.example.urlshortener.redirect.cache;
 
+import com.example.urlshortener.common.metrics.AppMetrics;
 import com.example.urlshortener.redirect.config.RedirectCacheProperties;
 import com.example.urlshortener.redirect.service.RedirectTarget;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,7 +40,8 @@ class RedirectCacheServiceTests {
                 redisTemplate,
                 new ObjectMapper().registerModule(new JavaTimeModule()),
                 properties,
-                Clock.fixed(Instant.parse("2026-08-07T00:00:00Z"), ZoneOffset.UTC)
+                Clock.fixed(Instant.parse("2026-08-07T00:00:00Z"), ZoneOffset.UTC),
+                mock(AppMetrics.class)
         );
     }
 
@@ -90,6 +92,15 @@ class RedirectCacheServiceTests {
 
         properties.setIneligibleTtl(Duration.ofSeconds(20));
         assertThat(cacheService.ttlFor(target(LocalDateTime.of(2026, 8, 8, 0, 0), false))).isEqualTo(Duration.ofSeconds(20));
+    }
+
+    @Test
+    void blockedTargetShouldUseIneligibleTtlAndRoundTripThroughCacheDto() {
+        properties.setIneligibleTtl(Duration.ofSeconds(20));
+        RedirectTarget blocked = new RedirectTarget(UUID.randomUUID(), "abc1234", "https://example.com", true, LocalDateTime.of(2026, 8, 8, 0, 0), false, true);
+
+        assertThat(cacheService.ttlFor(blocked)).isEqualTo(Duration.ofSeconds(20));
+        assertThat(RedirectCacheEntry.fromTarget(blocked).toTarget().blocked()).isTrue();
     }
 
     @Test

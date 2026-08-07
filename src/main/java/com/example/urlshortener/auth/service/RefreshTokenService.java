@@ -4,6 +4,7 @@ import com.example.urlshortener.auth.config.AuthProperties;
 import com.example.urlshortener.auth.entity.RefreshTokenEntity;
 import com.example.urlshortener.auth.repository.RefreshTokenRepository;
 import com.example.urlshortener.common.exception.BadRequestException;
+import com.example.urlshortener.common.metrics.AppMetrics;
 import com.example.urlshortener.user.entity.UserEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,10 +24,12 @@ public class RefreshTokenService {
     private final SecureRandom secureRandom = new SecureRandom();
     private final RefreshTokenRepository refreshTokenRepository;
     private final AuthProperties properties;
+    private final AppMetrics metrics;
 
-    public RefreshTokenService(RefreshTokenRepository refreshTokenRepository, AuthProperties properties) {
+    public RefreshTokenService(RefreshTokenRepository refreshTokenRepository, AuthProperties properties, AppMetrics metrics) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.properties = properties;
+        this.metrics = metrics;
     }
 
     @Transactional
@@ -43,6 +46,7 @@ public class RefreshTokenService {
             current.markReuseDetected(now);
             refreshTokenRepository.saveAndFlush(current);
             refreshTokenRepository.revokeActiveFamily(current.getFamilyId(), now);
+            metrics.auth("refresh_reuse", "detected");
             log.warn("Refresh token reuse detected for token family {}", current.getFamilyId());
             throw new BadRequestException("Invalid refresh token");
         }

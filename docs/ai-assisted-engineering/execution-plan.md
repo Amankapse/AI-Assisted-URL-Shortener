@@ -239,9 +239,13 @@ Expected outputs
 Acceptance criteria
 - CI passes.
 - Documentation covers setup, testing, and risks.
+- JaCoCo coverage evidence is generated.
+- Final engineering summary is complete.
+- Secret, dependency, and security sanity checks are documented.
 
 Tests
 - Full CI pipeline execution.
+- Local `./mvnw clean verify`, dependency tree, and Docker Compose validation.
 
 Security considerations
 - Dependency and secret scans.

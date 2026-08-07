@@ -1,6 +1,7 @@
 package com.example.urlshortener.analytics.service;
 
 import com.example.urlshortener.analytics.config.AnalyticsProperties;
+import com.example.urlshortener.common.metrics.AppMetrics;
 import com.example.urlshortener.redirect.service.RedirectTarget;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
@@ -45,12 +46,14 @@ class ClickAnalyticsServiceTests {
         ClickPrivacySanitizer sanitizer = new ClickPrivacySanitizer(properties);
         ClickAnalyticsWriter writer = mock(ClickAnalyticsWriter.class);
         AnalyticsCounters counters = new AnalyticsCounters();
+        AppMetrics metrics = mock(AppMetrics.class);
         ClickAnalyticsPublisher publisher = new ClickAnalyticsPublisher(
                 properties,
                 sanitizer,
                 writer,
                 counters,
-                Clock.fixed(Instant.parse("2026-08-07T00:00:00Z"), ZoneOffset.UTC)
+                Clock.fixed(Instant.parse("2026-08-07T00:00:00Z"), ZoneOffset.UTC),
+                metrics
         );
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getRemoteAddr()).thenReturn("203.0.113.10");

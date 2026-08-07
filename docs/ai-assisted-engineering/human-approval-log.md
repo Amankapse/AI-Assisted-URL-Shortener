@@ -31,3 +31,33 @@ This log records explicit approvals for decisions that affect architecture, secu
 - Approved adding `V3__click_analytics_indexes.sql`; `V1__initial_schema.sql` and `V2__authentication_refresh_tokens.sql` were not modified.
 - Explicitly deferred rate limiting, broad observability expansion, retention jobs, and Phase 5 work.
 - Validation: `.\mvnw.cmd clean verify` passed with 60 tests; `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed with only the existing obsolete-version warning.
+
+## Phase 5 Operational Readiness
+- Approved Phase 5 scope: observability, rate limiting, health/readiness, performance scripts, security hardening, runbooks, failure-mode validation, and final quality gates only.
+- Approved Redis Lua rate limiting with the existing `StringRedisTemplate`; no new production dependency was authorized or added.
+- Approved protected Actuator metrics exposure, public health/liveness/readiness probes, liveness excluding PostgreSQL/Redis, readiness requiring PostgreSQL and excluding Redis.
+- Approved centralized correlation ID filter with strict safe input validation and MDC cleanup.
+- Approved no Flyway migration for Phase 5 unless a genuine schema requirement was discovered; no migration was required.
+- Validation: `.\mvnw.cmd clean verify` passed with 72 tests; `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed with only the existing obsolete-version warning. `scripts/verify.sh` was attempted but failed before Maven startup because Bash did not have `JAVA_HOME` configured.
+
+## Phase 6 Final Release Readiness
+- Approved final phase scope: release readiness, CI/CD, quality evidence, documentation, and submission preparation only.
+- Approved adding JaCoCo Maven plugin as normal build-tooling evidence; no production dependency was added.
+- Approved no new product features, no architecture redesign, no microservices, no Kafka, no new authentication mechanism, and no additional infrastructure.
+- Validation: `.\mvnw.cmd clean verify` passed with 72 tests and generated JaCoCo coverage; `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed without warnings; k6 was unavailable and not installed automatically.
+
+## Final Documentation Synchronization
+- Requested final documentation and README synchronization only.
+- Constraints: no new features, no architecture/security/test redesign, no dependency changes, no migration changes, and no generated-code churn unless required to correct documentation-blocking drift.
+- Approved scope was applied to README, documentation index, stale documentation language, AI traceability logs, `.gitignore` local key hygiene, and the k6 script request-body correction needed to match the current API DTO.
+- Validation: Markdown links were checked; local Docker Compose PostgreSQL and Redis infrastructure was started and reported healthy; `docker compose config` passed without warnings; `.\mvnw.cmd clean verify` passed with 72 tests and generated JaCoCo coverage.
+
+## Hyperscale Production Evolution
+- Approved hyperscale documentation for NFRs, capacity, storage, analytics, global redirect, SLOs, lifecycle, and cost model.
+- Approved config-driven short-code generation with `shortener.code.length=8` and `shortener.code.max-retries=5`; cryptographically secure Base62 generation retained.
+- Approved collision retry/exhaustion metrics with no high-cardinality tags.
+- Approved config-driven URL quotas without a persisted quota/billing table.
+- Approved Flyway V4 using `blocked BOOLEAN NOT NULL DEFAULT FALSE`; V1-V3 were not modified.
+- Approved explicit `ROLE_ADMIN` block/unblock operations under admin URL moderation endpoints.
+- Explicitly not approved/implemented: Cassandra, DynamoDB, ScyllaDB, Bigtable, Kafka, Kinesis, Pulsar, Redis Cluster, CDN/edge, WAF, global load balancer, multi-region infrastructure, OLAP warehouse, or external malware provider.
+- Validation: `.\mvnw.cmd clean verify` passed with 84 tests and JaCoCo line 85.52% / branch 66.49%; PostgreSQL and Redis Testcontainers started; Flyway V1-V4 validated and applied; Hibernate schema validation succeeded; `.\mvnw.cmd dependency:tree` passed with no new production dependency; `docker compose config` passed without warnings.

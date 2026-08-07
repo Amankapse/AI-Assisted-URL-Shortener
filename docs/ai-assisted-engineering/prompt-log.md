@@ -20,6 +20,10 @@ This document records the major prompts used during AI-assisted planning and imp
 | P-014 | Phase 2 end-to-end validation | Expand Phase 2 tests across repositories, services, controllers, redirects, OpenAPI, pagination, collisions, and RFC7807 errors | Added regression coverage and fixed defects found after Flyway/Testcontainers startup | Accepted |
 | P-015 | Phase 3 authentication | Implement approved authentication, authorization, and secure ownership refinements without Redis/rate limiting/observability/admin expansion | Added Spring Security resource server, RS256 JWT, refresh-token rotation, CSRF refresh/logout, secure current-owner provider, V2 refresh-token migration, tests, and docs | Accepted |
 | P-016 | Phase 4 Redis and analytics | Implement approved Redis cache-aside and click analytics refinements without Phase 5 work | Added Redis redirect cache, single-flight miss protection, async sanitized analytics, V3 migration, owner/admin analytics endpoints, tests, and docs | Accepted |
+| P-017 | Phase 5 operational readiness | Implement approved observability, Redis Lua rate limiting, health/readiness, security hardening, k6 scripts, and operations documentation without new business features | Added bounded Micrometer metrics, correlation IDs, protected Actuator metrics, Redis Lua limiter policies, security headers, production analytics pepper validation, k6 scripts, tests, and docs | Accepted |
+| P-018 | Phase 6 release readiness | Finalize CI/CD, quality evidence, documentation, dependency/secret audit, coverage, and submission summary without product changes | Added JaCoCo reporting, expanded GitHub Actions, removed obsolete Compose version, rewrote README, added final engineering summary and release checklist, updated traceability | Edited |
+| P-019 | Final documentation synchronization | Perform final README and documentation synchronization pass without feature work | Reconciled README, docs index, stale phase language, coverage values, local startup instructions, and k6 request schema | Edited |
+| P-020 | Hyperscale production evolution | Evolve the validated baseline toward 100M new URLs/day without rewriting or adding distributed infrastructure | Added hyperscale NFR/capacity/architecture docs, configurable 8-character Base62 generation, collision metrics, config-driven quotas, V4 blocked moderation, admin block/unblock, tests, and traceability | Edited |
 
 ## P-013 Validation Notes
 
@@ -87,6 +91,148 @@ This document records the major prompts used during AI-assisted planning and imp
   - Hibernate schema validation succeeded against PostgreSQL 15.18.
   - `.\mvnw.cmd dependency:tree` passed and confirmed `flyway-core:11.7.2`, `flyway-database-postgresql:11.7.2`, `spring-boot-starter-data-redis:3.5.0`, Lettuce `6.5.5.RELEASE`, and no direct Jedis dependency.
   - `docker compose config` passed with only the existing obsolete `version` attribute warning.
+
+## P-017 Validation Notes
+
+- Scope: Phase 5 operational readiness only. No Phase 6 work, new business features, authentication redesign, Redis cache redesign, analytics redesign, migration change, or new production dependency was introduced.
+- Approved correction/design:
+  - Used the existing `StringRedisTemplate` with an atomic Redis Lua fixed-window script.
+  - Added configuration-driven limiter policies for registration, login, refresh, URL creation, public redirect, and admin analytics.
+  - Kept login/register/refresh fail-closed, public redirect fail-open, and URL/admin limiters fail-open as documented.
+  - Protected `/actuator/metrics` behind `ROLE_ADMIN`; exposed only health, liveness, readiness, info, and metrics at management exposure level.
+  - Centralized `X-Correlation-ID` validation in a servlet filter and reused the same ID in Problem Details.
+- Defects and refinements found during Phase 5:
+  - Root health/readiness initially became 503 when Redis was unavailable because Redis health was still part of aggregate health status; fixed by excluding Redis health and documenting Redis degradation through metrics/logs.
+  - URL creation alias conflicts initially double-counted failure metrics as both alias conflict and validation; fixed to record a single bounded reason.
+  - A Redis Testcontainers integration test left the Lettuce client active until container shutdown; added explicit client cleanup.
+- Validation:
+  - `.\mvnw.cmd clean verify` passed with 72 tests.
+  - PostgreSQL Testcontainers started successfully using Docker Desktop over the local npipe strategy.
+  - Redis Testcontainers started successfully for cache and rate-limit integration validation.
+  - Flyway validated 3 migrations and applied V1, V2, and V3.
+  - Hibernate schema validation succeeded against PostgreSQL 15.18.
+  - `.\mvnw.cmd dependency:tree` passed and confirmed `flyway-core:11.7.2`, `flyway-database-postgresql:11.7.2`, Spring Boot Actuator `3.5.0`, Micrometer `1.15.0`, `spring-boot-starter-data-redis:3.5.0`, Lettuce `6.5.5.RELEASE`, and no added rate-limiting library.
+  - `docker compose config` passed with only the existing obsolete `version` attribute warning.
+  - k6 was not executed because it is not installed in this environment.
+  - `scripts/verify.sh` was attempted but failed before Maven startup because Bash did not have `JAVA_HOME` configured; the equivalent Windows validation commands passed.
+
+## P-017 AI Output Examples
+
+### Accepted
+
+AI-generated Redis Lua fixed-window limiting through `StringRedisTemplate` was accepted because it met the no-new-dependency requirement and keeps Redis operations atomic.
+
+### Edited
+
+AI-generated URL creation metrics initially counted a custom-alias conflict twice. The implementation was edited to emit only `reason=alias_conflict`.
+
+### Rejected
+
+Treating Redis health as part of readiness was rejected after tests showed Redis outage made health probes fail. Redis is not required for correctness because PostgreSQL fallback exists, so Redis was removed from Actuator health readiness and is tracked through degradation metrics instead.
+
+## P-018 Validation Notes
+
+- Scope: final release readiness only. No product feature, migration, authentication redesign, microservice split, Kafka, or new infrastructure was introduced.
+- Release gaps addressed:
+  - Added JaCoCo Maven plugin and generated coverage evidence.
+  - Expanded GitHub Actions workflow for Java 21, Docker availability, Maven verify, Compose validation, and artifact upload.
+  - Removed obsolete top-level Compose `version`.
+  - Rewrote README for final reviewer evaluation.
+  - Added final engineering summary, release readiness checklist, and test quality review.
+  - Sanitized `.env.example` secret-bearing values into placeholders.
+  - Removed redundant Testcontainers BOM/property so Spring Boot dependency management is authoritative.
+- Validation:
+  - `.\mvnw.cmd clean verify` passed with 72 tests.
+  - JaCoCo generated line coverage 83.91% and branch coverage 63.25%.
+  - PostgreSQL and Redis Testcontainers started successfully.
+  - Flyway validated and applied V1, V2, and V3.
+  - Hibernate schema validation succeeded.
+  - `.\mvnw.cmd dependency:tree` passed and confirmed no direct Jedis dependency and no rate-limiting library.
+  - `docker compose config` passed without warnings.
+  - k6 was not executed because it is not installed.
+
+## P-018 AI Output Examples
+
+### Accepted
+
+AI-generated final README structure was accepted because it presents the project summary, architecture, quick start, validation, security, AI traceability, and limitations in reviewer-friendly form.
+
+### Edited
+
+AI initially left `.env.example` with local concrete secret-bearing values. The file was edited to use placeholders for database password, RSA key material, analytics pepper, and rate-limit key salt.
+
+### Rejected
+
+Adding heavy late-stage SAST/SCA tooling was rejected because it would introduce new build risk at the final phase without prior approval. The final submission records manual secret/dependency checks and leaves formal SAST/SCA as production evolution.
+
+## P-019 Validation Notes
+
+- Scope: final documentation and README synchronization only. No application feature, authentication, authorization, migration, dependency, or architecture change was introduced.
+- Documentation updates:
+  - Rewrote `README.md` into a reviewer-facing entry point with prerequisites, environment variables, local RSA key generation, startup sequence, API workflow, health/OpenAPI URLs, testing, coverage, security, limitations, and documentation index.
+  - Added `docs/README.md` as a documentation index.
+  - Corrected stale final-state language in testing, performance, rollback, requirements, and authentication documentation.
+  - Updated coverage references after the latest JaCoCo output: line coverage 83.91% and branch coverage 63.25%.
+- Defect found during documentation verification:
+  - `performance/k6/url-create.js` did not include the required `expiresAt` request field documented by the current API DTO. The script was corrected so the performance artifact matches the actual API contract.
+- Secret hygiene correction:
+  - Added local JWT private-key filename patterns to `.gitignore`; no key material was committed.
+- Validation:
+  - Markdown link check covered 40 Markdown files outside `target` and found no broken relative links.
+  - `docker compose up -d` started local PostgreSQL and Redis infrastructure, and `docker compose ps` reported both services healthy.
+  - `docker compose config` passed without warnings.
+  - `.\mvnw.cmd clean verify` passed with 72 tests and generated JaCoCo coverage.
+
+## P-019 AI Output Examples
+
+### Accepted
+
+AI-generated final README structure was accepted because it matched the requested evaluator-facing sections and pointed readers to the supporting architecture, security, testing, operations, and AI traceability documents.
+
+### Edited
+
+AI-generated coverage references were edited after rerunning JaCoCo so the repository reports the measured final values: 83.91% line coverage and 63.25% branch coverage.
+
+### Rejected
+
+Claiming Docker Compose starts the full application was rejected. The README now states that `compose.yaml` starts PostgreSQL and Redis infrastructure only, while the Spring Boot application is started separately through the Maven wrapper.
+
+## P-020 Validation Notes
+
+- Scope: hyperscale production evolution as an incremental change to the validated baseline.
+- Implemented now:
+  - Config-driven short-code generation using `shortener.code.length=8` and `shortener.code.max-retries=5`.
+  - Cryptographically secure Base62 generation retained.
+  - Existing 7-character short-code resolution preserved; no historical short codes are rewritten.
+  - Bounded collision retries now emit low-cardinality metrics for success, retry, and exhaustion.
+  - Config-driven `UrlQuotaService` added for daily creations, active links, and daily custom aliases.
+  - Flyway V4 added `short_urls.blocked BOOLEAN NOT NULL DEFAULT FALSE` plus an index.
+  - Admin block/unblock endpoints added under `/api/v1/admin/urls/{id}`.
+  - Redirect cache DTO includes blocked state; blocked redirects return safe not-found behavior.
+- Intentionally deferred as architecture-only:
+  - Distributed URL mapping store, Redis Cluster, CDN/edge routing, WAF/global load balancer, durable event stream, OLAP warehouse, multi-AZ/multi-region deployment, and external malware/phishing provider.
+- Validation:
+  - `.\mvnw.cmd clean verify` passed with 84 tests.
+  - PostgreSQL and Redis Testcontainers started successfully.
+  - Flyway validated and applied V1, V2, V3, and V4.
+  - Hibernate schema validation succeeded.
+  - JaCoCo generated line coverage 85.52% and branch coverage 66.49%.
+  - `.\mvnw.cmd dependency:tree` passed and confirmed no new production dependency was added.
+  - `docker compose config` passed without warnings.
+
+## P-020 AI Output Examples
+
+### Accepted
+
+The AI-generated separation between implemented baseline and architecture-only hyperscale components was accepted because it prevents false claims about CDN, Kafka, Redis Cluster, distributed KV storage, WAF, and multi-region infrastructure.
+
+### Edited
+
+The moderation model was narrowed to a `blocked` boolean instead of a lifecycle enum replacement. This preserved existing enabled, deleted, and expiration behavior while adding the approved abuse-control state.
+
+### Rejected
+
+Switching short-code generation to MD5 truncation, sequential public IDs, or Hashids-as-security was rejected. The implementation retained cryptographically secure random Base62 codes and the PostgreSQL unique constraint as the final concurrency-safe authority.
 
 ## AI was wrong example
 

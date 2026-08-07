@@ -8,7 +8,7 @@ This project is built on a set of defensible assumptions where the assignment do
 - All link creation and management requires authenticated users.
 - Public redirects are available without authentication.
 - Users may optionally request a custom alias within validation rules.
-- Links can expire by explicit timestamp or be disabled by the owner or admin.
+- Links can expire by explicit timestamp and can be disabled by the owner. Admin analytics are explicit; normal user URL APIs do not allow admin ownership bypass.
 - Analytics are click-based and eventually consistent for admin summaries.
 
 ## Operational assumptions
@@ -26,7 +26,7 @@ This project is built on a set of defensible assumptions where the assignment do
 ## Architecture assumptions
 
 - PostgreSQL is the authoritative store and supports all primary business queries.
-- Redis is used only for redirect caching and short-code resolution.
+- Redis is used for redirect caching and rate limiting. PostgreSQL remains authoritative.
 - The system is a single deployable monolith in the assignment timeframe.
 - Future separation into microservices is possible but not required now.
 
@@ -36,4 +36,4 @@ This project is built on a set of defensible assumptions where the assignment do
 - Refresh tokens are stored in Secure HttpOnly cookies and protected with CSRF defenses.
 - Refresh-token digests use SHA-256. The raw token is shown only once in an HttpOnly cookie and is never stored.
 - Production JWT signing keys are provided through environment variables; test-only ephemeral RSA keys are acceptable only for reproducible test runs.
-- Rate limits are future work and were not introduced during Phase 3 authentication validation.
+- Rate limits are implemented with Redis Lua policies. Authentication entrypoints have stricter fail-closed policies; public redirects and selected authenticated operations use documented fail-open behavior on Redis infrastructure failure.

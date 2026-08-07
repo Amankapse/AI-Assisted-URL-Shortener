@@ -11,8 +11,18 @@ public record RedirectTarget(
         String destinationUrl,
         boolean enabled,
         LocalDateTime expiresAt,
-        boolean deleted
+        boolean deleted,
+        boolean blocked
 ) {
+    public RedirectTarget(UUID urlId,
+                          String shortCode,
+                          String destinationUrl,
+                          boolean enabled,
+                          LocalDateTime expiresAt,
+                          boolean deleted) {
+        this(urlId, shortCode, destinationUrl, enabled, expiresAt, deleted, false);
+    }
+
     public static RedirectTarget fromEntity(ShortUrlEntity entity) {
         return new RedirectTarget(
                 entity.getId(),
@@ -20,7 +30,8 @@ public record RedirectTarget(
                 entity.getOriginalUrl(),
                 entity.isEnabled(),
                 entity.getExpiresAt(),
-                entity.isDeleted()
+                entity.isDeleted(),
+                entity.isBlocked()
         );
     }
 }

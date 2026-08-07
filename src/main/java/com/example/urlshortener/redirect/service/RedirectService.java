@@ -2,6 +2,10 @@ package com.example.urlshortener.redirect.service;
 
 import com.example.urlshortener.analytics.service.ClickAnalyticsPublisher;
 import com.example.urlshortener.common.exception.BadRequestException;
+import com.example.urlshortener.common.exception.ResourceNotFoundException;
+import com.example.urlshortener.common.metrics.AppMetrics;
+import com.example.urlshortener.common.ratelimit.RateLimiterService;
+import com.example.urlshortener.common.web.ClientIpResolver;
 import com.example.urlshortener.redirect.cache.RedirectCacheService;
 import com.example.urlshortener.redirect.cache.SingleFlightRedirectLoader;
 import com.example.urlshortener.url.service.UrlService;
@@ -19,29 +23,48 @@ public class RedirectService {
     private final SingleFlightRedirectLoader singleFlightLoader;
     private final ClickAnalyticsPublisher analyticsPublisher;
     private final Clock clock;
+    private final RateLimiterService rateLimiter;
+    private final ClientIpResolver clientIpResolver;
+    private final AppMetrics metrics;
 
     public RedirectService(UrlService urlService,
                            RedirectCacheService cacheService,
                            SingleFlightRedirectLoader singleFlightLoader,
                            ClickAnalyticsPublisher analyticsPublisher,
-                           Clock clock) {
+                           Clock clock,
+                           RateLimiterService rateLimiter,
+                           ClientIpResolver clientIpResolver,
+                           AppMetrics metrics) {
         this.urlService = urlService;
         this.cacheService = cacheService;
         this.singleFlightLoader = singleFlightLoader;
         this.analyticsPublisher = analyticsPublisher;
         this.clock = clock;
+        this.rateLimiter = rateLimiter;
+        this.clientIpResolver = clientIpResolver;
+        this.metrics = metrics;
     }
 
     public RedirectTarget resolve(String shortCode, HttpServletRequest request) {
-        RedirectTarget target = cacheService.get(shortCode)
-                .orElseGet(() -> singleFlightLoader.load(
-                        shortCode,
-                        () -> cacheService.get(shortCode).orElseGet(() -> loadAndCache(shortCode)),
-                        () -> urlService.resolveRedirectTarget(shortCode)
-                ));
-        validateEligible(target);
-        analyticsPublisher.publish(target, request);
-        return target;
+        rateLimiter.enforce("redirect", clientIpResolver.resolve(request));
+        try {
+            RedirectTarget target = cacheService.get(shortCode)
+                    .orElseGet(() -> singleFlightLoader.load(
+                            shortCode,
+                            () -> cacheService.get(shortCode).orElseGet(() -> loadAndCache(shortCode)),
+                            () -> urlService.resolveRedirectTarget(shortCode)
+                    ));
+            validateEligible(target);
+            analyticsPublisher.publish(target, request);
+            metrics.redirect("success");
+            return target;
+        } catch (ResourceNotFoundException ex) {
+            metrics.redirect("not_found");
+            throw ex;
+        } catch (BadRequestException ex) {
+            metrics.redirect(reason(ex));
+            throw ex;
+        }
     }
 
     private RedirectTarget loadAndCache(String shortCode) {
@@ -54,6 +77,9 @@ public class RedirectService {
         if (target.deleted()) {
             throw new BadRequestException("Short URL has been deleted");
         }
+        if (target.blocked()) {
+            throw new ResourceNotFoundException("Short URL not found");
+        }
         if (!target.enabled()) {
             throw new BadRequestException("Short URL is disabled");
         }
@@ -63,5 +89,22 @@ public class RedirectService {
         if (target.destinationUrl() == null || target.destinationUrl().isBlank()) {
             throw new BadRequestException("Short URL destination is unavailable");
         }
+    }
+
+    private String reason(BadRequestException ex) {
+        String message = ex.getMessage() == null ? "" : ex.getMessage().toLowerCase(java.util.Locale.ROOT);
+        if (message.contains("deleted")) {
+            return "deleted";
+        }
+        if (message.contains("blocked")) {
+            return "blocked";
+        }
+        if (message.contains("disabled")) {
+            return "disabled";
+        }
+        if (message.contains("expired")) {
+            return "expired";
+        }
+        return "invalid";
     }
 }
