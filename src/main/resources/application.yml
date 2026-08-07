@@ -47,6 +47,7 @@ management:
       percentiles:
         http.server.requests: 0.5,0.95,0.99
 server:
+  port: ${PORT:8080}
   tomcat:
     max-http-form-post-size: ${SERVER_MAX_HTTP_FORM_POST_SIZE:2MB}
     max-swallow-size: ${SERVER_MAX_SWALLOW_SIZE:2MB}

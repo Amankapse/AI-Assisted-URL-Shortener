@@ -9,6 +9,11 @@ target/
 .vscode/
 .DS_Store
 .env
+.env.local
 local-jwt-*.pem
+*.pem
 *.key
 *.p8
+private.pem
+public.pem
+secrets/

@@ -2,6 +2,15 @@
 
 This directory contains the detailed evidence for the AI-Assisted URL Shortener assessment. Start with the root [README](../README.md), then use this index for deeper review.
 
+## Deployment
+
+- [Deployment overview](deployment/README.md)
+- [Render deployment](deployment/render.md)
+- [Neon PostgreSQL](deployment/neon.md)
+- [Environment variables](deployment/environment-variables.md)
+- [Production validation](deployment/production-validation.md)
+- [Free-tier limitations](deployment/free-tier-limitations.md)
+
 ## Architecture
 
 - [Architecture overview](architecture/architecture-overview.md)

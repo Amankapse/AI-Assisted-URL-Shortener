@@ -61,3 +61,10 @@ This log records explicit approvals for decisions that affect architecture, secu
 - Approved explicit `ROLE_ADMIN` block/unblock operations under admin URL moderation endpoints.
 - Explicitly not approved/implemented: Cassandra, DynamoDB, ScyllaDB, Bigtable, Kafka, Kinesis, Pulsar, Redis Cluster, CDN/edge, WAF, global load balancer, multi-region infrastructure, OLAP warehouse, or external malware provider.
 - Validation: `.\mvnw.cmd clean verify` passed with 84 tests and JaCoCo line 85.52% / branch 66.49%; PostgreSQL and Redis Testcontainers started; Flyway V1-V4 validated and applied; Hibernate schema validation succeeded; `.\mvnw.cmd dependency:tree` passed with no new production dependency; `docker compose config` passed without warnings.
+
+## Render Live Deployment Configuration
+
+- Requested deployment/configuration changes only for Render Web Service, Neon PostgreSQL, and Render Key Value / Valkey.
+- Constraints: no architecture redesign, no business logic change, no authentication behavior change, no Flyway migration change, no PostgreSQL/Redis abstraction replacement, no secret commits, and no new production dependency unless a concrete blocker required approval.
+- Approved implementation path: production profile configuration, Render `PORT` support, environment-driven Neon/Redis/JWT/CORS/privacy settings, Docker runtime JAR startup, `.env.example` deployment template, `.gitignore`/`.dockerignore` secret hygiene, README link, and deployment documentation.
+- Validation: `.\mvnw.cmd clean verify` passed with 84 tests and JaCoCo line 84.44% / branch 65.41%; PostgreSQL and Redis Testcontainers started; Flyway V1-V4 validated and applied; Hibernate schema validation succeeded; `.\mvnw.cmd dependency:tree` passed with no new production dependency; `docker compose config` passed; Markdown link check passed for 54 files; `docker compose up -d` plus bounded local `spring-boot:run` liveness smoke passed; Docker image build `url-shortener-render-smoke` passed.

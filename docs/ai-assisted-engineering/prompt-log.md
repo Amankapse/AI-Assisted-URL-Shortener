@@ -24,6 +24,7 @@ This document records the major prompts used during AI-assisted planning and imp
 | P-018 | Phase 6 release readiness | Finalize CI/CD, quality evidence, documentation, dependency/secret audit, coverage, and submission summary without product changes | Added JaCoCo reporting, expanded GitHub Actions, removed obsolete Compose version, rewrote README, added final engineering summary and release checklist, updated traceability | Edited |
 | P-019 | Final documentation synchronization | Perform final README and documentation synchronization pass without feature work | Reconciled README, docs index, stale phase language, coverage values, local startup instructions, and k6 request schema | Edited |
 | P-020 | Hyperscale production evolution | Evolve the validated baseline toward 100M new URLs/day without rewriting or adding distributed infrastructure | Added hyperscale NFR/capacity/architecture docs, configurable 8-character Base62 generation, collision metrics, config-driven quotas, V4 blocked moderation, admin block/unblock, tests, and traceability | Edited |
+| P-021 | Render live deployment configuration | Prepare deployment configuration for Render Web Service, Neon PostgreSQL, and Render Key Value without feature or architecture changes | Added `prod` profile, Render port support, Docker JAR runtime, deployment variable template, deployment docs, README links, and secret-ignore hardening | Edited |
 
 ## P-013 Validation Notes
 
@@ -233,6 +234,48 @@ The moderation model was narrowed to a `blocked` boolean instead of a lifecycle 
 ### Rejected
 
 Switching short-code generation to MD5 truncation, sequential public IDs, or Hashids-as-security was rejected. The implementation retained cryptographically secure random Base62 codes and the PostgreSQL unique constraint as the final concurrency-safe authority.
+
+## P-021 Validation Notes
+
+- Scope: Render live deployment configuration only. No business logic, authentication behavior, Flyway migration, public API contract, or production dependency was changed.
+- Implemented:
+  - Added `application-prod.yml` with environment-driven Neon PostgreSQL, Render Key Value, JWT, CORS, analytics privacy, rate-limit salt, conservative Hikari, Flyway enabled, and Hibernate `ddl-auto=validate`.
+  - Added shared `server.port=${PORT:8080}` for Render while preserving local default port 8080.
+  - Changed Docker runtime startup to run the built application JAR from a Java 21 JRE image instead of Maven `spring-boot:run`.
+  - Added `.dockerignore` and expanded `.gitignore` to avoid sending or committing local env files, PEM/key files, and `secrets/`.
+  - Reorganized `.env.example` into deployment sections with placeholders only.
+  - Added Render, Neon, environment-variable, production-validation, and free-tier limitation docs.
+  - Fixed `application-local.yml` profile activation from invalid `spring.profiles` to `spring.config.activate.on-profile` after the local startup smoke exposed the Spring Boot 3.5 compatibility defect.
+- Selected mechanisms:
+  - Redis/Valkey: `SPRING_DATA_REDIS_URL` for Render Key Value internal URL.
+  - JWT: existing `APP_AUTH_PRIVATE_KEY_PEM` and `APP_AUTH_PUBLIC_KEY_PEM` environment PEM content; no production test-key fallback.
+  - Health check: `/actuator/health/liveness`; readiness still requires PostgreSQL and excludes Redis.
+- Validation:
+  - `.\mvnw.cmd clean verify` passed with 84 tests and JaCoCo line coverage 84.44% / branch coverage 65.41%.
+  - PostgreSQL and Redis Testcontainers started successfully.
+  - Flyway validated and applied V1, V2, V3, and V4.
+  - Hibernate schema validation succeeded.
+  - `.\mvnw.cmd dependency:tree` passed and confirmed no new production dependency.
+  - `docker compose config` passed.
+  - Markdown link check passed for 54 Markdown files.
+  - `docker compose up -d` started local infrastructure and a bounded local `spring-boot:run` liveness smoke passed using temporary in-memory RSA key material.
+  - `docker build -t url-shortener-render-smoke .` passed.
+
+## P-021 AI Output Examples
+
+### Accepted
+
+Using Spring Boot `spring.data.redis.url` in the production profile was accepted because it supports Render Key Value internal URLs with the smallest profile-only change.
+
+### Edited
+
+The initial deployment template used generic `JWT_*` names from the request. It was edited to the repository's existing `APP_AUTH_*` property names to avoid duplicate configuration paths.
+
+The local compatibility smoke exposed invalid Spring Boot 3.5 profile activation in `application-local.yml`; the config was edited to `spring.config.activate.on-profile`.
+
+### Rejected
+
+Hard-coding Render or Neon hostnames, adding a new Redis client dependency, and changing Flyway migrations were rejected as outside the deployment-only scope.
 
 ## AI was wrong example
 
