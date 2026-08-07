@@ -22,6 +22,7 @@ This document records the major prompts used during AI-assisted planning and imp
 | P-016 | Phase 4 Redis and analytics | Implement approved Redis cache-aside and click analytics refinements without Phase 5 work | Added Redis redirect cache, single-flight miss protection, async sanitized analytics, V3 migration, owner/admin analytics endpoints, tests, and docs | Accepted |
 | P-017 | Phase 5 operational readiness | Implement approved observability, Redis Lua rate limiting, health/readiness, security hardening, k6 scripts, and operations documentation without new business features | Added bounded Micrometer metrics, correlation IDs, protected Actuator metrics, Redis Lua limiter policies, security headers, production analytics pepper validation, k6 scripts, tests, and docs | Accepted |
 | P-018 | Phase 6 release readiness | Finalize CI/CD, quality evidence, documentation, dependency/secret audit, coverage, and submission summary without product changes | Added JaCoCo reporting, expanded GitHub Actions, removed obsolete Compose version, rewrote README, added final engineering summary and release checklist, updated traceability | Edited |
+| P-019 | Final documentation synchronization | Perform final README and documentation synchronization pass without feature work | Reconciled README, docs index, stale phase language, coverage values, local startup instructions, and k6 request schema | Edited |
 
 ## P-013 Validation Notes
 
@@ -141,7 +142,7 @@ Treating Redis health as part of readiness was rejected after tests showed Redis
   - Removed redundant Testcontainers BOM/property so Spring Boot dependency management is authoritative.
 - Validation:
   - `.\mvnw.cmd clean verify` passed with 72 tests.
-  - JaCoCo generated line coverage 85.08% and branch coverage 64.46%.
+  - JaCoCo generated line coverage 83.91% and branch coverage 63.25%.
   - PostgreSQL and Redis Testcontainers started successfully.
   - Flyway validated and applied V1, V2, and V3.
   - Hibernate schema validation succeeded.
@@ -162,6 +163,38 @@ AI initially left `.env.example` with local concrete secret-bearing values. The 
 ### Rejected
 
 Adding heavy late-stage SAST/SCA tooling was rejected because it would introduce new build risk at the final phase without prior approval. The final submission records manual secret/dependency checks and leaves formal SAST/SCA as production evolution.
+
+## P-019 Validation Notes
+
+- Scope: final documentation and README synchronization only. No application feature, authentication, authorization, migration, dependency, or architecture change was introduced.
+- Documentation updates:
+  - Rewrote `README.md` into a reviewer-facing entry point with prerequisites, environment variables, local RSA key generation, startup sequence, API workflow, health/OpenAPI URLs, testing, coverage, security, limitations, and documentation index.
+  - Added `docs/README.md` as a documentation index.
+  - Corrected stale final-state language in testing, performance, rollback, requirements, and authentication documentation.
+  - Updated coverage references after the latest JaCoCo output: line coverage 83.91% and branch coverage 63.25%.
+- Defect found during documentation verification:
+  - `performance/k6/url-create.js` did not include the required `expiresAt` request field documented by the current API DTO. The script was corrected so the performance artifact matches the actual API contract.
+- Secret hygiene correction:
+  - Added local JWT private-key filename patterns to `.gitignore`; no key material was committed.
+- Validation:
+  - Markdown link check covered 40 Markdown files outside `target` and found no broken relative links.
+  - `docker compose up -d` started local PostgreSQL and Redis infrastructure, and `docker compose ps` reported both services healthy.
+  - `docker compose config` passed without warnings.
+  - `.\mvnw.cmd clean verify` passed with 72 tests and generated JaCoCo coverage.
+
+## P-019 AI Output Examples
+
+### Accepted
+
+AI-generated final README structure was accepted because it matched the requested evaluator-facing sections and pointed readers to the supporting architecture, security, testing, operations, and AI traceability documents.
+
+### Edited
+
+AI-generated coverage references were edited after rerunning JaCoCo so the repository reports the measured final values: 83.91% line coverage and 63.25% branch coverage.
+
+### Rejected
+
+Claiming Docker Compose starts the full application was rejected. The README now states that `compose.yaml` starts PostgreSQL and Redis infrastructure only, while the Spring Boot application is started separately through the Maven wrapper.
 
 ## AI was wrong example
 

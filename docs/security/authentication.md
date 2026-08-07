@@ -2,7 +2,7 @@
 
 ## Current Phase
 
-Phase 5 preserves the Phase 3 authentication and ownership model and adds operational hardening around it. Authentication remains RS256 JWT based, refresh-token rotation remains opaque-cookie based, and user URL ownership is still derived from `CurrentOwnerProvider` rather than client-supplied owner fields.
+The final implementation preserves the Phase 3 authentication and ownership model and adds operational hardening around it. Authentication is RS256 JWT based, refresh-token rotation is opaque-cookie based, and user URL ownership is derived from `CurrentOwnerProvider` rather than client-supplied owner fields.
 
 ## Access Tokens
 

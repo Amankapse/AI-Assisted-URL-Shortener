@@ -2,7 +2,7 @@
 
 ## Measured local results
 
-k6 was not executed because `k6 version` failed with `The term 'k6' is not recognized`. No throughput, latency, or error-rate values are claimed for Phase 5.
+k6 was not executed because `k6 version` failed with `The term 'k6' is not recognized`. No throughput, latency, or error-rate values are claimed for final validation.
 
 Available environment details:
 

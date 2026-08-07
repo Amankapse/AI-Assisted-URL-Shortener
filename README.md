@@ -1,193 +1,638 @@
-# AI-Assisted URL Shortener Assessment
+# AI-Assisted URL Shortener
 
-Production-oriented URL shortener built for the AI-Proficient Software Engineering assessment track. The project demonstrates engineer-led AI-assisted development: AI was used to plan, draft, implement, test, review, and document, while architecture, correctness, security, and release approval remain human-owned.
+**AI-Proficient Software Engineering Assessment**
 
-## Project Summary
-
-The application provides authenticated URL shortening with custom aliases, expiration, disable/enable, owner-scoped management, public redirects, Redis cache-aside redirect resolution, click analytics, admin analytics, rate limiting, operational metrics, and production-readiness documentation.
-
-Technology stack:
-
-- Java 21, Spring Boot 3.5, Maven
-- Spring MVC, Spring Security, OAuth2 Resource Server
-- PostgreSQL, Flyway, Hibernate/JPA
-- Redis, Lettuce
-- Spring Boot Actuator, Micrometer
-- JUnit 5, Mockito, MockMvc, Testcontainers
-- Docker Compose, GitHub Actions, JaCoCo, k6 scripts
+This repository contains a production-oriented URL shortener implemented with Java 21 and Spring Boot 3.5. It was developed through an engineer-owned, spec-driven AI-assisted workflow: AI helped with planning, implementation, tests, review, and documentation, while the engineer retained responsibility for architecture, security, correctness, and release decisions.
 
 ## Key Capabilities
 
-- Secure registration/login with BCrypt password hashes
-- RS256 JWT access tokens with issuer, audience, expiry, and claim validation
-- Opaque refresh-token rotation, digest storage, reuse detection, and CSRF-protected refresh/logout
-- Owner-scoped URL APIs without client-supplied owner IDs
-- Short URL creation, custom aliases, expiration, disable/enable, soft delete, and redirect behavior
-- Redis cache-aside redirects with bounded TTLs, PostgreSQL fallback, and after-commit invalidation
-- Bounded in-process single-flight protection for hot cache misses
-- Asynchronous click analytics with sanitized IP/referrer/user-agent/correlation metadata
-- Owner analytics and explicit admin analytics endpoints
-- Redis Lua rate limiting with configurable policies
-- Correlation IDs, RFC7807-style errors, security headers, liveness/readiness, and Micrometer metrics
+- User registration and login
+- `USER` and `ADMIN` authorization
+- RS256 JWT access tokens
+- Rotating opaque refresh tokens stored only as SHA-256 digests
+- Refresh-token reuse detection and token-family revocation
+- CSRF protection for refresh/logout cookie flows
+- URL creation with optional custom aliases
+- Expiration, enable/disable, and soft deletion
+- Owner-scoped URL management without client-supplied owner IDs
+- Public redirect endpoint
+- Redis cache-aside redirect lookup
+- After-commit cache invalidation
+- Bounded single-flight miss protection
+- Click analytics with sanitized metadata
+- Owner analytics and explicit admin analytics
+- Redis Lua rate limiting
+- Micrometer metrics and Spring Boot Actuator
+- Correlation IDs
+- Health, liveness, and readiness probes
+- RFC7807-style Problem Details
+- OpenAPI/Swagger
+- Flyway migrations
+- PostgreSQL and Redis Testcontainers
+- GitHub Actions CI workflow
+- JaCoCo coverage reporting
+- k6 performance scripts
 
-## Architecture
+## Technology Stack
+
+| Technology | Actual version/source |
+| --- | --- |
+| Java | 21 |
+| Spring Boot | 3.5.0 |
+| Spring MVC | Spring Framework 6.2.7 via Spring Boot |
+| Spring Security | 6.5.0 via Spring Boot |
+| Spring Data JPA | 3.5.0 via Spring Boot |
+| PostgreSQL | `postgres:15-alpine` for Compose/Testcontainers; JDBC driver 42.7.5 |
+| Redis | `redis:7-alpine`; Lettuce 6.5.5.RELEASE |
+| Flyway | 11.7.2, including `flyway-database-postgresql` |
+| Maven | Wrapper downloads Apache Maven 3.9.16 |
+| Springdoc/OpenAPI | `springdoc-openapi-starter-webmvc-ui` 2.8.6 |
+| Micrometer/Actuator | Micrometer 1.15.0, Spring Boot Actuator 3.5.0 |
+| JUnit | 5.12.2 via Spring Boot test |
+| Mockito | 5.17.0 via Spring Boot test |
+| Testcontainers | 1.21.0 via Spring Boot dependency management |
+| Docker | Docker Desktop/Engine required; local validation used Docker server 29.6.1 |
+| GitHub Actions | `.github/workflows/ci.yml` |
+| JaCoCo | 0.8.12 Maven plugin |
+| k6 | Scripts in `performance/k6/`; local execution was not performed because k6 was unavailable |
+
+## Architecture Overview
 
 ```mermaid
-flowchart LR
-    Client[Client / Browser] --> API[Spring MVC Controllers]
-    API --> Security[Spring Security RS256 JWT + CSRF]
-    Security --> Services[Application Services]
-    Services --> Postgres[(PostgreSQL Source of Truth)]
-    Services --> Redis[(Redis Cache / Rate Limit)]
-    API --> Redirect[Public Redirect Controller]
-    Redirect --> Cache[Redirect Cache-Aside]
-    Cache --> Redis
-    Cache --> Postgres
-    Redirect --> Analytics[Bounded Async Analytics]
+flowchart TB
+    Client[Client / Browser / API Consumer] --> App[Spring Boot Modular Monolith]
+    App --> Security[Security: JWT, CSRF, CORS, Ownership]
+    App --> Auth[Auth Module]
+    App --> Urls[URL Management]
+    App --> Redirect[Redirect Module]
+    App --> Analytics[Analytics Module]
+    App --> RateLimit[Redis Lua Rate Limiting]
+    App --> Observability[Actuator + Micrometer + Correlation IDs]
+    Auth --> Postgres[(PostgreSQL)]
+    Urls --> Postgres
+    Redirect --> Redis[(Redis)]
+    Redirect --> Postgres
     Analytics --> Postgres
-    Services --> Metrics[Micrometer / Actuator]
+    RateLimit --> Redis
+    Observability --> Metrics[Operational Metrics]
 ```
 
-The service is a modular monolith. PostgreSQL is authoritative. Redis is an optimization and is not required for redirect correctness where PostgreSQL is available.
+The application is a modular monolith to keep feature boundaries clear without adding distributed-system complexity. PostgreSQL is the source of truth for users, URLs, refresh-token digests, and analytics. Redis is an optimization for redirect cache-aside and rate limiting; redirect correctness falls back to PostgreSQL when Redis is unavailable. Analytics are asynchronous and best-effort so redirect latency remains protected. Ownership is derived from the authenticated JWT subject and enforced in services/repositories.
 
-## Quick Start
+Detailed architecture is in [docs/architecture/architecture-overview.md](docs/architecture/architecture-overview.md).
 
-Prerequisites:
+# Prerequisites
 
-- Java 21
-- Docker Desktop or compatible Docker runtime
-- Git
+Docker must be running because integration tests start PostgreSQL and Redis through Testcontainers.
 
-Validate on Windows:
+| Prerequisite | Verification command |
+| --- | --- |
+| Git | `git --version` |
+| Java 21 JDK | `java -version` |
+| Docker Desktop / Docker Engine | `docker --version` |
+| Docker Compose | `docker compose version` |
+| Maven | Maven wrapper is included; separate Maven install is not required |
+| PowerShell | Required for Windows commands |
+| Bash | Required for Unix/macOS commands and `scripts/verify.sh` |
+| k6 | Optional; `k6 version` |
+
+For Bash usage, ensure `JAVA_HOME` points to a JDK. The Windows Maven wrapper command `.\mvnw.cmd` works with Java on `PATH`.
+
+# Environment Configuration
+
+Use [.env.example](.env.example) as a variable-name template only. Do not commit real secrets.
+
+| Variable | Required | Purpose | Example |
+| --- | --- | --- | --- |
+| `SPRING_PROFILES_ACTIVE` | Local recommended | Activate local profile | `local` |
+| `SPRING_DATASOURCE_URL` | Yes | PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/shortener` |
+| `SPRING_DATASOURCE_USERNAME` | Yes | Database username | `shortener` |
+| `SPRING_DATASOURCE_PASSWORD` | Yes | Database password | `<database-password>` |
+| `SPRING_REDIS_HOST` | Yes | Redis host | `localhost` |
+| `SPRING_REDIS_PORT` | Yes | Redis port | `6379` |
+| `SPRING_REDIS_TIMEOUT` | No | Redis command timeout | `2s` |
+| `SPRING_REDIS_SSL` | No | Redis SSL toggle | `false` |
+| `APP_AUTH_ISSUER` | Yes | JWT issuer | `url-shortener` |
+| `APP_AUTH_AUDIENCE` | Yes | JWT audience | `url-shortener-api` |
+| `APP_AUTH_KEY_ID` | Yes | JWT `kid` header value | `local-dev` |
+| `APP_AUTH_PRIVATE_KEY_PEM` | Yes outside `test` | PKCS8 RSA private key PEM content | `<private-key-pem-from-secret-manager>` |
+| `APP_AUTH_PUBLIC_KEY_PEM` | Yes outside `test` | X.509 RSA public key PEM content | `<public-key-pem-from-secret-manager>` |
+| `APP_AUTH_ACCESS_TOKEN_TTL` | No | Access-token lifetime | `15m` |
+| `APP_AUTH_REFRESH_TOKEN_TTL` | No | Refresh-token lifetime | `14d` |
+| `APP_AUTH_ALLOWED_ORIGINS` | Yes for browser clients | CORS allowlist | `http://localhost:3000,http://localhost:8080` |
+| `APP_AUTH_SECURE_COOKIES` | Yes by environment | Secure refresh cookie flag | `false` for local HTTP, `true` for HTTPS production |
+| `APP_REDIRECT_CACHE_ENABLED` | No | Redirect cache toggle | `true` |
+| `APP_REDIRECT_CACHE_TTL` | No | Eligible redirect cache TTL | `10m` |
+| `APP_REDIRECT_CACHE_INELIGIBLE_TTL` | No | Disabled/expired/deleted cache TTL | `30s` |
+| `APP_REDIRECT_CACHE_JITTER` | No | Cache TTL jitter | `30s` |
+| `APP_REDIRECT_CACHE_SINGLE_FLIGHT_TIMEOUT` | No | Single-flight wait timeout | `2s` |
+| `APP_REDIRECT_CACHE_SINGLE_FLIGHT_CAPACITY` | No | Single-flight in-flight key capacity | `1024` |
+| `APP_ANALYTICS_IP_HASH_PEPPER` | Yes for production | HMAC pepper for IP anonymization | `<analytics-hmac-pepper-from-secret-manager>` |
+| `APP_ANALYTICS_QUEUE_CAPACITY` | No | Analytics queue capacity | `1000` |
+| `APP_ANALYTICS_BATCH_SIZE` | No | Analytics batch size | `100` |
+| `APP_ANALYTICS_FLUSH_INTERVAL` | No | Analytics flush interval | `1s` |
+| `APP_ANALYTICS_OFFER_TIMEOUT` | No | Queue offer timeout | `10ms` |
+| `APP_ANALYTICS_SHUTDOWN_FLUSH_TIMEOUT` | No | Shutdown flush timeout | `5s` |
+| `APP_ANALYTICS_RETRY_COUNT` | No | Batch persistence retry count | `2` |
+| `APP_ANALYTICS_TOP_LINKS_MAX` | No | Max admin top-links limit | `25` |
+| `APP_RATE_LIMIT_ENABLED` | No | Rate-limit toggle | `true` |
+| `APP_RATE_LIMIT_KEY_SALT` | Yes for production | Salt for hashed rate-limit keys | `<rate-limit-key-salt-from-secret-manager>` |
+| `APP_RATE_LIMIT_REDIS_TIMEOUT` | No | Rate-limit Redis timeout setting | `250ms` |
+| `APP_RATE_LIMIT_REGISTRATION_LIMIT` | No | Registration limit | `5` |
+| `APP_RATE_LIMIT_REGISTRATION_WINDOW` | No | Registration window | `1m` |
+| `APP_RATE_LIMIT_LOGIN_LIMIT` | No | Login limit | `5` |
+| `APP_RATE_LIMIT_LOGIN_WINDOW` | No | Login window | `1m` |
+| `APP_RATE_LIMIT_REFRESH_LIMIT` | No | Refresh limit | `30` |
+| `APP_RATE_LIMIT_REFRESH_WINDOW` | No | Refresh window | `1m` |
+| `APP_RATE_LIMIT_URL_CREATE_LIMIT` | No | URL creation limit | `60` |
+| `APP_RATE_LIMIT_URL_CREATE_WINDOW` | No | URL creation window | `1m` |
+| `APP_RATE_LIMIT_REDIRECT_LIMIT` | No | Public redirect limit | `600` |
+| `APP_RATE_LIMIT_REDIRECT_WINDOW` | No | Public redirect window | `1m` |
+| `APP_RATE_LIMIT_ADMIN_ANALYTICS_LIMIT` | No | Admin analytics limit | `120` |
+| `APP_RATE_LIMIT_ADMIN_ANALYTICS_WINDOW` | No | Admin analytics window | `1m` |
+| `SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE` | No | Hikari max pool size | `10` |
+| `SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT` | No | Hikari connection timeout ms | `30000` |
+| `SERVER_MAX_HTTP_FORM_POST_SIZE` | No | Tomcat form body limit | `2MB` |
+| `SERVER_MAX_SWALLOW_SIZE` | No | Tomcat swallow size limit | `2MB` |
+
+Production requires strong values for RSA keys, analytics pepper, rate-limit salt, database credentials, and Redis credentials/network controls. Never commit real values.
+
+## Generate Local RSA Keys
+
+The implementation expects PEM content in environment variables, not key-file paths. The private key signs access tokens; the public key validates them. Generated local keys are development-only and must never be committed.
+
+Generate keys with OpenSSL:
+
+```powershell
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out local-jwt-private.pem
+openssl rsa -pubout -in local-jwt-private.pem -out local-jwt-public.pem
+```
+
+Load them into PowerShell environment variables:
+
+```powershell
+$env:APP_AUTH_PRIVATE_KEY_PEM = (Get-Content .\local-jwt-private.pem -Raw).Replace("`r`n", "\n").Replace("`n", "\n")
+$env:APP_AUTH_PUBLIC_KEY_PEM = (Get-Content .\local-jwt-public.pem -Raw).Replace("`r`n", "\n").Replace("`n", "\n")
+```
+
+Unix/macOS:
+
+```bash
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out local-jwt-private.pem
+openssl rsa -pubout -in local-jwt-private.pem -out local-jwt-public.pem
+export APP_AUTH_PRIVATE_KEY_PEM="$(awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}' local-jwt-private.pem)"
+export APP_AUTH_PUBLIC_KEY_PEM="$(awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}' local-jwt-public.pem)"
+```
+
+`.gitignore` excludes `local-jwt-*.pem`, `*.key`, and `*.p8`.
+
+# Quick Start
+
+## Windows - VS Code / PowerShell
+
+1. Clone and enter the repository:
+
+```powershell
+git clone https://github.com/Amankapse/AI-Assisted-URL-Shortener.git
+cd AI-Assisted-URL-Shortener
+```
+
+2. Verify Java and Docker:
+
+```powershell
+java -version
+docker --version
+docker compose version
+```
+
+3. Start infrastructure:
+
+```powershell
+docker compose up -d
+docker compose ps
+```
+
+4. Generate/load local RSA keys, then set local environment variables:
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = "local"
+$env:SPRING_DATASOURCE_URL = "jdbc:postgresql://localhost:5432/shortener"
+$env:SPRING_DATASOURCE_USERNAME = "shortener"
+$env:SPRING_DATASOURCE_PASSWORD = "shortener"
+$env:SPRING_REDIS_HOST = "localhost"
+$env:SPRING_REDIS_PORT = "6379"
+$env:APP_AUTH_ISSUER = "url-shortener"
+$env:APP_AUTH_AUDIENCE = "url-shortener-api"
+$env:APP_AUTH_KEY_ID = "local-dev"
+$env:APP_AUTH_ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:8080"
+$env:APP_AUTH_SECURE_COOKIES = "false"
+$env:APP_ANALYTICS_IP_HASH_PEPPER = "local-development-only-change-me"
+$env:APP_RATE_LIMIT_KEY_SALT = "local-development-rate-limit-salt"
+```
+
+5. Start the application:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
+
+6. Verify health:
+
+```powershell
+Invoke-RestMethod http://localhost:8080/actuator/health
+Invoke-RestMethod http://localhost:8080/actuator/health/liveness
+Invoke-RestMethod http://localhost:8080/actuator/health/readiness
+```
+
+7. Open Swagger UI:
+
+```text
+http://localhost:8080/swagger-ui.html
+```
+
+## Unix/macOS
+
+```bash
+git clone https://github.com/Amankapse/AI-Assisted-URL-Shortener.git
+cd AI-Assisted-URL-Shortener
+java -version
+docker --version
+docker compose version
+docker compose up -d
+docker compose ps
+```
+
+After generating/loading local RSA keys:
+
+```bash
+export SPRING_PROFILES_ACTIVE=local
+export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/shortener
+export SPRING_DATASOURCE_USERNAME=shortener
+export SPRING_DATASOURCE_PASSWORD=shortener
+export SPRING_REDIS_HOST=localhost
+export SPRING_REDIS_PORT=6379
+export APP_AUTH_ISSUER=url-shortener
+export APP_AUTH_AUDIENCE=url-shortener-api
+export APP_AUTH_KEY_ID=local-dev
+export APP_AUTH_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+export APP_AUTH_SECURE_COOKIES=false
+export APP_ANALYTICS_IP_HASH_PEPPER=local-development-only-change-me
+export APP_RATE_LIMIT_KEY_SALT=local-development-rate-limit-salt
+./mvnw spring-boot:run
+```
+
+## Docker Startup
+
+`compose.yaml` starts infrastructure only:
+
+- PostgreSQL on `localhost:5432`
+- Redis on `localhost:6379`
+
+The Compose file does not start the Spring Boot application container. Run the application from your IDE or Maven wrapper while PostgreSQL and Redis run in Docker.
+
+# Verify the Application
+
+| Purpose | URL |
+| --- | --- |
+| Health | `http://localhost:8080/actuator/health` |
+| Liveness | `http://localhost:8080/actuator/health/liveness` |
+| Readiness | `http://localhost:8080/actuator/health/readiness` |
+| OpenAPI JSON | `http://localhost:8080/v3/api-docs` |
+| Swagger UI | `http://localhost:8080/swagger-ui.html` |
+
+PowerShell:
+
+```powershell
+Invoke-RestMethod http://localhost:8080/actuator/health
+Invoke-RestMethod http://localhost:8080/v3/api-docs
+```
+
+Bash:
+
+```bash
+curl -s http://localhost:8080/actuator/health
+curl -s http://localhost:8080/v3/api-docs
+```
+
+# First API Workflow
+
+The following PowerShell sequence uses actual request paths and DTO field names.
+
+```powershell
+$base = "http://localhost:8080"
+$headers = @{ "Content-Type" = "application/json" }
+
+$registerBody = @{
+  email = "reader@example.com"
+  password = "correct-horse-password"
+} | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri "$base/api/v1/auth/register" -Headers $headers -Body $registerBody
+
+$loginBody = @{
+  email = "reader@example.com"
+  password = "correct-horse-password"
+} | ConvertTo-Json
+$auth = Invoke-RestMethod -Method Post -Uri "$base/api/v1/auth/login" -Headers $headers -Body $loginBody
+$token = $auth.accessToken
+$authHeaders = @{ Authorization = "Bearer $token"; "Content-Type" = "application/json" }
+
+$expiresAt = (Get-Date).AddDays(7).ToString("yyyy-MM-ddTHH:mm:ss")
+$createBody = @{
+  originalUrl = "https://example.com/"
+  customAlias = "demo-readme"
+  expiresAt = $expiresAt
+} | ConvertTo-Json
+$url = Invoke-RestMethod -Method Post -Uri "$base/api/v1/urls" -Headers $authHeaders -Body $createBody
+$url
+
+curl.exe -i "$base/r/$($url.shortCode)"
+
+Invoke-RestMethod -Method Get -Uri "$base/api/v1/urls/$($url.id)/analytics" -Headers @{ Authorization = "Bearer $token" }
+Invoke-RestMethod -Method Get -Uri "$base/api/v1/urls/$($url.id)/analytics/daily" -Headers @{ Authorization = "Bearer $token" }
+```
+
+Admin analytics endpoints require an authenticated `ADMIN` user. There is no public admin creation endpoint.
+
+# Authentication Overview
+
+```text
+Register
+  -> Login
+  -> RS256 access token
+  -> Authorization: Bearer <token>
+  -> Protected APIs
+```
+
+Refresh flow:
+
+```text
+Opaque refresh token
+  -> Secure HttpOnly cookie
+  -> CSRF-protected refresh/logout
+  -> token rotation
+  -> reuse detection revokes the token family
+```
+
+See [docs/security/authentication.md](docs/security/authentication.md) and [docs/architecture/adr/ADR-004-security-model.md](docs/architecture/adr/ADR-004-security-model.md).
+
+# Database Migrations
+
+Flyway runs automatically on application startup. PostgreSQL is authoritative and historical migrations are not edited.
+
+| Migration | Purpose |
+| --- | --- |
+| `V1__initial_schema.sql` | Initial users, short URLs, click events, UUIDs, enums, indexes, constraints |
+| `V2__authentication_refresh_tokens.sql` | Refresh-token table, token digest uniqueness, family/user indexes |
+| `V3__click_analytics_indexes.sql` | Click analytics correlation ID, soft-delete support, analytics indexes |
+
+Migration files are in `src/main/resources/db/migration/`.
+
+# Testing
+
+Docker must be running.
+
+Windows:
 
 ```powershell
 .\mvnw.cmd clean verify
-.\mvnw.cmd dependency:tree
-docker compose config
 ```
 
-Validate on Unix/macOS:
+Unix/macOS:
 
 ```bash
 ./mvnw clean verify
-./mvnw dependency:tree
-docker compose config
 ```
 
-Start dependencies:
+The verified suite contains 72 tests. The build starts PostgreSQL and Redis Testcontainers automatically, runs Flyway migrations, validates Hibernate schema mappings, executes unit/integration/security/operation tests, builds the jar, and generates JaCoCo coverage.
 
-```powershell
-docker compose up -d postgres redis
+# Coverage
+
+Current JaCoCo results:
+
+- Line coverage: 83.91%
+- Branch coverage: 63.25%
+- Report: `target/site/jacoco/index.html`
+
+Coverage is quality evidence, not proof of correctness. See [docs/testing/coverage-summary.md](docs/testing/coverage-summary.md).
+
+# Performance Testing
+
+k6 scripts are provided in `performance/k6/`:
+
+- `redirect-cache-hit.js`
+- `redirect-cache-miss.js`
+- `url-create.js`
+- `login.js`
+- `user-analytics.js`
+- `admin-analytics.js`
+
+Example:
+
+```bash
+k6 run performance/k6/redirect-cache-hit.js
 ```
 
-Build the application image:
+Scripts use environment variables such as `BASE_URL`, `VUS`, `DURATION`, `ACCESS_TOKEN`, `ADMIN_ACCESS_TOKEN`, `SHORT_CODE`, and `URL_ID` depending on the scenario. Local measured results are not included because k6 was unavailable during final validation. See [docs/testing/performance-plan.md](docs/testing/performance-plan.md) and [docs/testing/performance-results.md](docs/testing/performance-results.md).
 
-```powershell
-docker compose up --build
-```
+# CI/CD
 
-Local runtime requires valid RSA key environment variables. The `test` profile generates ephemeral test-only keys for reproducible tests.
+GitHub Actions workflow: [.github/workflows/ci.yml](.github/workflows/ci.yml)
 
-## Configuration
+The workflow:
 
-Use `.env.example` as a variable-name template only. Do not commit real secrets.
+- checks out the repository
+- configures Java 21
+- uses Maven dependency caching
+- verifies Docker availability
+- runs `./mvnw clean verify`
+- runs PostgreSQL and Redis Testcontainers through the test suite
+- generates JaCoCo coverage
+- uploads test and coverage artifacts
+- validates Docker Compose configuration
 
-Required production-sensitive settings include:
+Remote CI status is not claimed until the workflow runs on GitHub after push.
 
-- `SPRING_DATASOURCE_URL`
-- `SPRING_DATASOURCE_USERNAME`
-- `SPRING_DATASOURCE_PASSWORD`
-- `SPRING_REDIS_HOST`
-- `APP_AUTH_PRIVATE_KEY_PEM`
-- `APP_AUTH_PUBLIC_KEY_PEM`
-- `APP_AUTH_KEY_ID`
-- `APP_AUTH_ALLOWED_ORIGINS`
-- `APP_AUTH_SECURE_COOKIES=true`
-- `APP_ANALYTICS_IP_HASH_PEPPER`
-- `APP_RATE_LIMIT_KEY_SALT`
+# Observability
 
-## API
+Implemented observability includes:
 
-API notes are in [docs/api.md](docs/api.md). Generated OpenAPI is exposed at `/v3/api-docs`; Swagger UI is available at `/swagger-ui.html` when the application is running.
+- Actuator health endpoints
+- Micrometer HTTP and application metrics
+- bounded metric tags only; no user ID, URL ID, short code, email, IP address, token ID, or exception-message tags
+- `X-Correlation-ID` propagation and sanitization
+- liveness excluding PostgreSQL and Redis
+- readiness requiring PostgreSQL and excluding Redis
+- Redis cache/single-flight metrics
+- authentication metrics
+- analytics queue/event/batch metrics
+- rate-limit accepted/rejected/failure metrics
 
-## Testing And Quality Evidence
+See [docs/architecture/observability.md](docs/architecture/observability.md).
 
-Current validation:
-
-- 72 tests passing
-- PostgreSQL Testcontainers
-- Redis Testcontainers
-- Flyway V1, V2, V3 validation and application
-- Hibernate schema validation
-- MockMvc controller/security coverage
-- Redis cache and rate-limit integration tests
-- JaCoCo report generated during `verify`
-
-Coverage details are recorded in [docs/testing/coverage-summary.md](docs/testing/coverage-summary.md). Test strategy is documented in [docs/testing/test-strategy.md](docs/testing/test-strategy.md).
-
-## AI-Assisted Engineering
-
-The project uses spec-driven AI assistance with human review gates. Evidence is recorded in:
-
-- [docs/ai-assisted-engineering/execution-plan.md](docs/ai-assisted-engineering/execution-plan.md)
-- [docs/ai-assisted-engineering/prompt-log.md](docs/ai-assisted-engineering/prompt-log.md)
-- [docs/ai-assisted-engineering/traceability-matrix.md](docs/ai-assisted-engineering/traceability-matrix.md)
-- [docs/ai-assisted-engineering/human-approval-log.md](docs/ai-assisted-engineering/human-approval-log.md)
-
-The logs include accepted, edited, and rejected AI output, including invalid dependency suggestions, authentication design refinements, Flyway PostgreSQL module correction, and observability/rate-limit corrections.
-
-## Security
+# Security
 
 Security controls include:
 
-- Deny-by-default Spring Security configuration
-- RS256 JWT validation with issuer, audience, expiration, signature, and required claims
 - BCrypt password hashing
-- Refresh-token digest storage, rotation, reuse detection, and family revocation
-- CSRF protection for cookie-based refresh/logout
-- Explicit CORS allowlist with no wildcard credentials
-- Owner enforcement through JWT subject and service/repository scoping
-- SSRF-oriented destination URL validation for schemes and private/link-local hosts
-- Redis Lua rate limiting for registration, login, refresh, URL creation, redirects, and admin analytics
-- RFC7807 safe error responses with correlation IDs and no stack traces
-- No sensitive Actuator endpoints exposed
-- Sanitized analytics storage; production HMAC pepper required under `prod`
+- RS256 JWTs with issuer, audience, expiration, signature, and required-claim validation
+- `kid` emitted in the JOSE header
+- opaque refresh tokens stored as SHA-256 digests
+- refresh-token rotation and reuse detection
+- CSRF protection for refresh/logout cookie flows
+- explicit CORS allowlist
+- deny-by-default authorization
+- ownership and IDOR protection through JWT subject and repository/service scope
+- Redis rate limiting
+- HMAC analytics IP anonymization
+- secure headers
+- no sensitive Actuator endpoint exposure
+- production secret values expected from environment/secret management
 
-Threats and residual risks are documented in [docs/security/threat-model.md](docs/security/threat-model.md).
+See [docs/security/authentication.md](docs/security/authentication.md) and [docs/security/threat-model.md](docs/security/threat-model.md).
 
-## Production Considerations
+# Failure And Degradation Behavior
 
-- PostgreSQL is the source of truth.
-- Redis outage increases database traffic but valid redirects can continue through PostgreSQL fallback.
-- Rate-limit failure behavior is endpoint-specific and documented.
-- Analytics ingestion is best-effort and bounded to protect redirect latency.
-- In-process single-flight is JVM-local; horizontal scaling needs distributed coordination if this becomes a bottleneck.
-- Production deployment should use managed PostgreSQL/Redis, external secret management, centralized logs/metrics/traces, and infrastructure DDoS controls.
+| Failure | Expected behavior |
+| --- | --- |
+| Redis cache unavailable | Redirect resolution falls back to PostgreSQL |
+| Redis rate limiter unavailable | Endpoint-specific fail-open/fail-closed policy applies |
+| PostgreSQL unavailable | Readiness reports DOWN; PostgreSQL-backed reads/writes fail safely |
+| Analytics queue full | Redirect succeeds; analytics event may be dropped |
+| Refresh-token reuse | Token family is revoked and login is required |
+| Invalid JWT | HTTP 401 Problem Details |
+| Unauthorized ownership | Owner-scoped APIs return not-found for inaccessible resources; admin-only APIs return 403 for non-admin users |
 
-## Limitations
+# Known Limitations
 
-- No durable event broker; analytics can drop events under sustained overload.
+- Analytics queue is best-effort and can drop events under overload.
+- No durable Kafka/event broker.
+- Single-flight protection is JVM-local.
 - No distributed single-flight or distributed lock.
-- k6 scripts exist, but local k6 execution was unavailable in this environment.
-- No multi-region deployment or Kubernetes manifests.
 - No external secret manager integration in the prototype.
-- Registration duplicate responses can still reveal an already-registered email.
-- CI workflow is defined, but remote CI execution must be verified after push.
+- No Kubernetes deployment manifests.
+- No multi-region architecture.
+- k6 scripts exist, but local load results were not measured because k6 was unavailable.
+- Remote CI status is pending until the branch is pushed and the workflow runs on GitHub.
+- No public admin provisioning flow is implemented.
 
-## Documentation Index
+# AI-Assisted Engineering Approach
 
-- [Final engineering summary](docs/final-engineering-summary.md)
-- [Architecture overview](docs/architecture/architecture-overview.md)
-- [ADRs](docs/architecture/adr)
-- [API notes](docs/api.md)
-- [Testing strategy](docs/testing/test-strategy.md)
-- [Test quality review](docs/testing/test-quality-review.md)
-- [Coverage summary](docs/testing/coverage-summary.md)
-- [Performance plan](docs/testing/performance-plan.md)
-- [Performance results](docs/testing/performance-results.md)
-- [Release readiness checklist](docs/release-readiness-checklist.md)
-- [Security authentication notes](docs/security/authentication.md)
-- [Threat model](docs/security/threat-model.md)
-- [Operational runbook](docs/operations/runbook.md)
-- [Rollback guide](docs/operations/rollback.md)
-- [AI traceability](docs/ai-assisted-engineering/traceability-matrix.md)
+This project follows an engineer-owned AI-assisted development workflow:
+
+1. Requirements were normalized into explicit specs and phases.
+2. Architecture and implementation plans were proposed.
+3. Human approval was required for high-risk decisions such as dependencies, migrations, authentication, authorization, and public API changes.
+4. AI assisted implementation, tests, documentation, and review.
+5. Generated output was reviewed and accepted, edited, or rejected.
+6. Build, security, Docker/Testcontainers, and documentation evidence was recorded.
+7. Traceability was maintained across prompts, decisions, artifacts, and validation.
+
+Documented examples include:
+
+- invalid `org.testcontainers:redis` dependency rejected and replaced with `GenericContainer<>("redis:7-alpine")`
+- custom JWT filter approach replaced by Spring Security resource-server flow
+- JWT `kid` handled in the JOSE header
+- CSRF decisions reviewed around cookie-based refresh/logout
+- Redis kept as an optimization rather than source of truth
+- high-cardinality metric tags avoided
+- late-stage heavy SAST/SCA tooling rejected to avoid destabilizing final validation
+
+See [docs/ai-assisted-engineering/](docs/ai-assisted-engineering/).
+
+# Repository Structure
+
+```text
+src/
+  main/
+    java/          Spring Boot application modules
+    resources/     application config and Flyway migrations
+  test/            unit, integration, security, and operation tests
+docs/
+  architecture/    architecture overview, diagrams, ADRs
+  security/        authentication notes and threat model
+  testing/         test strategy, coverage, performance, quality review
+  operations/      runbook and rollback guide
+  requirements/    normalized requirements, assumptions, acceptance criteria
+  scenarios/       greenfield, brownfield, ambiguous scenarios
+  ai-assisted-engineering/ traceability and approval logs
+performance/
+  k6/              reproducible k6 scripts
+.github/
+  workflows/       CI workflow
+```
+
+# Documentation Index
+
+## Architecture
+
+| Document | Purpose |
+| --- | --- |
+| [Architecture overview](docs/architecture/architecture-overview.md) | System structure and flows |
+| [Component diagram](docs/architecture/component-diagram.md) | Mermaid component view |
+| [Create URL sequence](docs/architecture/sequence-create-url.md) | Create flow |
+| [Redirect sequence](docs/architecture/sequence-redirect.md) | Redirect/cache/analytics flow |
+| [Authentication sequence](docs/architecture/sequence-authentication.md) | Auth flow |
+| [Observability](docs/architecture/observability.md) | Metrics, Actuator, correlation IDs |
+| [Rate limiting](docs/architecture/rate-limiting.md) | Redis Lua limiter design |
+| [ADR-001 Modular monolith](docs/architecture/adr/ADR-001-modular-monolith.md) | Architecture decision |
+| [ADR-002 PostgreSQL source of truth](docs/architecture/adr/ADR-002-postgresql-source-of-truth.md) | Persistence decision |
+| [ADR-003 Redis cache-aside](docs/architecture/adr/ADR-003-redis-cache-aside.md) | Cache decision |
+| [ADR-004 Security model](docs/architecture/adr/ADR-004-security-model.md) | Auth/security decision |
+| [ADR-005 Click analytics](docs/architecture/adr/ADR-005-click-analytics.md) | Analytics decision |
+
+## Security
+
+| Document | Purpose |
+| --- | --- |
+| [Authentication and ownership](docs/security/authentication.md) | JWT, refresh, CSRF, ownership |
+| [Threat model](docs/security/threat-model.md) | Threats, mitigations, residual risk |
+| [Security ADR](docs/architecture/adr/ADR-004-security-model.md) | Security architecture decision |
+
+## API
+
+| Document | Purpose |
+| --- | --- |
+| [API notes](docs/api.md) | Endpoints, ownership, errors, operational endpoints |
+
+## Testing
+
+| Document | Purpose |
+| --- | --- |
+| [Test strategy](docs/testing/test-strategy.md) | Test tiers and validation evidence |
+| [Coverage summary](docs/testing/coverage-summary.md) | JaCoCo coverage |
+| [Test quality review](docs/testing/test-quality-review.md) | Test quality audit |
+| [Performance plan](docs/testing/performance-plan.md) | k6 scenarios and targets |
+| [Performance results](docs/testing/performance-results.md) | Local performance execution status |
+
+## Operations
+
+| Document | Purpose |
+| --- | --- |
+| [Runbook](docs/operations/runbook.md) | Startup and incident response |
+| [Rollback guide](docs/operations/rollback.md) | Rollback policy |
+| [Observability](docs/architecture/observability.md) | Health/readiness/metrics |
+| [Rate limiting](docs/architecture/rate-limiting.md) | Limiter policies and failure behavior |
+
+## AI-Assisted Engineering
+
+| Document | Purpose |
+| --- | --- |
+| [Normalized requirements](docs/requirements/normalized-requirements.md) | Requirement decomposition |
+| [Non-functional requirements](docs/requirements/non-functional-requirements.md) | NFRs |
+| [Assumptions](docs/requirements/assumptions.md) | Explicit assumptions |
+| [Acceptance criteria](docs/requirements/acceptance-criteria.md) | Acceptance criteria |
+| [Greenfield scenario](docs/scenarios/01-greenfield.md) | Greenfield plan |
+| [Brownfield scenario](docs/scenarios/02-brownfield.md) | Brownfield enhancement |
+| [Ambiguous scenario](docs/scenarios/03-ambiguous.md) | Ambiguity handling |
+| [Execution plan](docs/ai-assisted-engineering/execution-plan.md) | Phase plan |
+| [Prompt log](docs/ai-assisted-engineering/prompt-log.md) | Significant prompts and results |
+| [Traceability matrix](docs/ai-assisted-engineering/traceability-matrix.md) | Requirement/prompt/artifact mapping |
+| [Human approval log](docs/ai-assisted-engineering/human-approval-log.md) | Approval evidence |
+
+## Final Assessment
+
+| Document | Purpose |
+| --- | --- |
+| [Final engineering summary](docs/final-engineering-summary.md) | Assessment narrative and evidence |
+| [Release readiness checklist](docs/release-readiness-checklist.md) | Final audit and release checks |
+| [Documentation index](docs/README.md) | Docs tree navigation |

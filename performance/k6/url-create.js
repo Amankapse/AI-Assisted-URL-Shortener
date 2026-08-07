@@ -17,6 +17,7 @@ export default function () {
   const body = JSON.stringify({
     originalUrl: `https://example.com/load/${__VU}/${__ITER}`,
     customAlias: `k6_${__VU}_${__ITER}_${Date.now()}`,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19),
   });
   const response = http.post(`${baseUrl}/api/v1/urls`, body, {
     headers: {

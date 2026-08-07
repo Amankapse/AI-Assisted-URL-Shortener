@@ -10,7 +10,7 @@ Use the previous immutable image tag. Verify that its expected database schema i
 
 ## Flyway policy
 
-Migrations are forward-only. Do not blindly roll back destructive database changes. Phase 5 adds no migration. Previous migrations remain V1, V2, and V3.
+Migrations are forward-only. Do not blindly roll back destructive database changes. The final release-readiness pass added no migration. Existing migrations remain V1, V2, and V3.
 
 ## Feature/config rollback
 

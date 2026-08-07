@@ -45,3 +45,9 @@ This log records explicit approvals for decisions that affect architecture, secu
 - Approved adding JaCoCo Maven plugin as normal build-tooling evidence; no production dependency was added.
 - Approved no new product features, no architecture redesign, no microservices, no Kafka, no new authentication mechanism, and no additional infrastructure.
 - Validation: `.\mvnw.cmd clean verify` passed with 72 tests and generated JaCoCo coverage; `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed without warnings; k6 was unavailable and not installed automatically.
+
+## Final Documentation Synchronization
+- Requested final documentation and README synchronization only.
+- Constraints: no new features, no architecture/security/test redesign, no dependency changes, no migration changes, and no generated-code churn unless required to correct documentation-blocking drift.
+- Approved scope was applied to README, documentation index, stale documentation language, AI traceability logs, `.gitignore` local key hygiene, and the k6 script request-body correction needed to match the current API DTO.
+- Validation: Markdown links were checked; local Docker Compose PostgreSQL and Redis infrastructure was started and reported healthy; `docker compose config` passed without warnings; `.\mvnw.cmd clean verify` passed with 72 tests and generated JaCoCo coverage.

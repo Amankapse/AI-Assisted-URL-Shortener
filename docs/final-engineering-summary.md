@@ -105,8 +105,8 @@ Final release validation includes:
 Final local results:
 
 - Tests: 72 passing
-- Line coverage: 85.08%
-- Branch coverage: 64.46%
+- Line coverage: 83.91%
+- Branch coverage: 63.25%
 - Docker: PostgreSQL and Redis Testcontainers started successfully
 - Migrations: Flyway V1, V2, and V3 validated and applied
 - Schema: Hibernate validation succeeded
