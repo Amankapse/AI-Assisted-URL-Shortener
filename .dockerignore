@@ -1,0 +1,12 @@
+.git
+.idea
+.vscode
+target
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+secrets/
+local-jwt-*.pem

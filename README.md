@@ -110,6 +110,7 @@ Use [.env.example](.env.example) as a variable-name template only. Do not commit
 | `SPRING_DATASOURCE_URL` | Yes | PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/shortener` |
 | `SPRING_DATASOURCE_USERNAME` | Yes | Database username | `shortener` |
 | `SPRING_DATASOURCE_PASSWORD` | Yes | Database password | `<database-password>` |
+| `SPRING_DATA_REDIS_URL` | Production | Render Key Value / Redis URL | `<redis-or-valkey-url>` |
 | `SPRING_REDIS_HOST` | Yes | Redis host | `localhost` |
 | `SPRING_REDIS_PORT` | Yes | Redis port | `6379` |
 | `SPRING_REDIS_TIMEOUT` | No | Redis command timeout | `2s` |
@@ -159,7 +160,12 @@ Use [.env.example](.env.example) as a variable-name template only. Do not commit
 | `SHORTENER_QUOTA_MAX_ACTIVE_LINKS_PER_USER` | No | Maximum active links per user | `100000` |
 | `SHORTENER_QUOTA_DAILY_CUSTOM_ALIASES_PER_USER` | No | Daily custom aliases per user | `1000` |
 | `SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE` | No | Hikari max pool size | `10` |
+| `SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE` | No | Hikari minimum idle connections | `1` |
 | `SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT` | No | Hikari connection timeout ms | `30000` |
+| `SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT` | No | Hikari idle timeout ms | `300000` |
+| `SPRING_DATASOURCE_HIKARI_MAX_LIFETIME` | No | Hikari max connection lifetime ms | `900000` |
+| `PORT` | Render supplied | HTTP port | `8080` |
+| `JAVA_TOOL_OPTIONS` | No | JVM heap/GC options | `-Xms64m -Xmx320m -XX:+UseG1GC` |
 | `SERVER_MAX_HTTP_FORM_POST_SIZE` | No | Tomcat form body limit | `2MB` |
 | `SERVER_MAX_SWALLOW_SIZE` | No | Tomcat swallow size limit | `2MB` |
 
@@ -297,6 +303,22 @@ export APP_RATE_LIMIT_KEY_SALT=local-development-rate-limit-salt
 - Redis on `localhost:6379`
 
 The Compose file does not start the Spring Boot application container. Run the application from your IDE or Maven wrapper while PostgreSQL and Redis run in Docker.
+
+## Live Deployment
+
+The live demonstration deployment path uses:
+
+```text
+Render Web Service
+  + Neon PostgreSQL
+  + Render Key Value / Valkey
+```
+
+Deployment uses the existing Dockerfile and the `prod` Spring profile. Render supplies `PORT`; the application maps it through `server.port=${PORT:8080}`. Neon is configured through `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`. Render Key Value is configured through `SPRING_DATA_REDIS_URL`.
+
+This is a live free-tier demonstration deployment, not the 100M-URLs/day hyperscale architecture target. Free-tier cold starts, memory limits, non-persistent cache/rate-limit state, and Neon capacity limits are documented separately.
+
+See [docs/deployment/README.md](docs/deployment/README.md).
 
 # Verify the Application
 
@@ -455,8 +477,8 @@ The verified suite contains 84 tests. The build starts PostgreSQL and Redis Test
 
 Current JaCoCo results:
 
-- Line coverage: 85.52%
-- Branch coverage: 66.49%
+- Line coverage: 84.44%
+- Branch coverage: 65.41%
 - Report: `target/site/jacoco/index.html`
 
 Coverage is quality evidence, not proof of correctness. See [docs/testing/coverage-summary.md](docs/testing/coverage-summary.md).
@@ -655,6 +677,7 @@ performance/
 
 | Document | Purpose |
 | --- | --- |
+| [Deployment](docs/deployment/README.md) | Render, Neon, and Render Key Value deployment guide |
 | [Runbook](docs/operations/runbook.md) | Startup and incident response |
 | [Rollback guide](docs/operations/rollback.md) | Rollback policy |
 | [Observability](docs/architecture/observability.md) | Health/readiness/metrics |

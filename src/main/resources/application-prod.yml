@@ -1,0 +1,52 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:5}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:1}
+      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT:300000}
+      max-lifetime: ${SPRING_DATASOURCE_HIKARI_MAX_LIFETIME:900000}
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  data:
+    redis:
+      url: ${SPRING_DATA_REDIS_URL}
+
+management:
+  health:
+    redis:
+      enabled: false
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState,ping
+        readiness:
+          include: readinessState,db
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+app:
+  auth:
+    issuer: ${APP_AUTH_ISSUER}
+    audience: ${APP_AUTH_AUDIENCE}
+    key-id: ${APP_AUTH_KEY_ID}
+    private-key-pem: ${APP_AUTH_PRIVATE_KEY_PEM}
+    public-key-pem: ${APP_AUTH_PUBLIC_KEY_PEM}
+    allowed-origins: ${APP_AUTH_ALLOWED_ORIGINS}
+    secure-cookies: ${APP_AUTH_SECURE_COOKIES:true}
+  analytics:
+    ip-hash-pepper: ${APP_ANALYTICS_IP_HASH_PEPPER}
+  rate-limit:
+    key-salt: ${APP_RATE_LIMIT_KEY_SALT}
