@@ -72,6 +72,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/r/{shortCode}", "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness", "/actuator/info", "/v3/api-docs", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/metrics", "/actuator/metrics/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/analytics/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/urls/{id}/block", "/api/v1/admin/urls/{id}/unblock").hasRole("ADMIN")
                         .requestMatchers("/api/v1/auth/me", "/api/v1/urls/**").hasRole("USER")
                         .anyRequest().denyAll());
         return http.build();

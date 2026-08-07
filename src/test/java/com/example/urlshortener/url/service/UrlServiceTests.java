@@ -4,6 +4,7 @@ import com.example.urlshortener.common.exception.BadRequestException;
 import com.example.urlshortener.common.exception.ResourceNotFoundException;
 import com.example.urlshortener.common.metrics.AppMetrics;
 import com.example.urlshortener.common.ratelimit.RateLimiterService;
+import com.example.urlshortener.url.config.ShortCodeProperties;
 import com.example.urlshortener.url.dto.CreateShortUrlRequest;
 import com.example.urlshortener.url.dto.UpdateShortUrlRequest;
 import com.example.urlshortener.url.entity.ShortUrlEntity;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +48,8 @@ class UrlServiceTests {
     private ApplicationEventPublisher eventPublisher;
     private RateLimiterService rateLimiter;
     private AppMetrics metrics;
+    private ShortCodeProperties shortCodeProperties;
+    private UrlQuotaService quotaService;
     private UrlService urlService;
 
     @BeforeEach
@@ -58,7 +62,9 @@ class UrlServiceTests {
         eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
         rateLimiter = Mockito.mock(RateLimiterService.class);
         metrics = Mockito.mock(AppMetrics.class);
-        urlService = new UrlService(shortUrlRepository, validationService, shortCodeGenerator, ownerProvider, userRepository, eventPublisher, rateLimiter, metrics);
+        shortCodeProperties = new ShortCodeProperties();
+        quotaService = Mockito.mock(UrlQuotaService.class);
+        urlService = new UrlService(shortUrlRepository, validationService, shortCodeGenerator, ownerProvider, userRepository, eventPublisher, rateLimiter, metrics, shortCodeProperties, quotaService);
     }
 
     @Test
@@ -75,6 +81,8 @@ class UrlServiceTests {
         when(shortUrlRepository.save(any(ShortUrlEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         assertThat(urlService.create(request).getShortCode()).isEqualTo("ABC1234");
+        verify(quotaService).enforceCreateQuota(owner, request);
+        verify(metrics).shortCodeGeneration("success");
     }
 
     @Test
@@ -127,6 +135,8 @@ class UrlServiceTests {
         when(shortUrlRepository.save(any(ShortUrlEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         assertThat(urlService.create(request).getShortCode()).isEqualTo("UNIQUE1");
+        verify(metrics).shortCodeGeneration("collision_retry");
+        verify(metrics).shortCodeGeneration("success");
     }
 
     @Test
@@ -144,6 +154,8 @@ class UrlServiceTests {
         assertThatThrownBy(() -> urlService.create(request))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Unable to generate unique short code");
+        verify(metrics, times(5)).shortCodeGeneration("collision_retry");
+        verify(metrics).shortCodeGeneration("retry_exhausted");
     }
 
     @Test
@@ -236,6 +248,39 @@ class UrlServiceTests {
 
         assertThat(urlService.disable(id).isEnabled()).isFalse();
         assertThat(urlService.enable(id).isEnabled()).isTrue();
+    }
+
+    @Test
+    void ownerShouldNotEnableAdministrativelyBlockedUrl() {
+        UUID id = UUID.randomUUID();
+        UserEntity owner = new UserEntity(UUID.randomUUID(), PLACEHOLDER_EMAIL, "", UserRole.USER, UserStatus.ACTIVE);
+        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com", null, owner, LocalDateTime.now().plusDays(1));
+        entity.setBlocked(true);
+        when(ownerProvider.getCurrentOwner()).thenReturn(new OwnerIdentity(owner.getId(), PLACEHOLDER_EMAIL, UserRole.USER));
+        when(userRepository.getReferenceById(owner.getId())).thenReturn(owner);
+        when(shortUrlRepository.findByIdAndOwner(id, owner)).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(() -> urlService.enable(id))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Blocked");
+    }
+
+    @Test
+    void adminBlockAndUnblockShouldBeIdempotentAndInvalidateCacheOnlyOnChange() {
+        UUID id = UUID.randomUUID();
+        UserEntity owner = new UserEntity(UUID.randomUUID(), PLACEHOLDER_EMAIL, "", UserRole.USER, UserStatus.ACTIVE);
+        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com", null, owner, LocalDateTime.now().plusDays(1));
+        when(shortUrlRepository.findById(id)).thenReturn(Optional.of(entity));
+        when(shortUrlRepository.save(entity)).thenReturn(entity);
+
+        urlService.block(id);
+        urlService.block(id);
+        urlService.unblock(id);
+        urlService.unblock(id);
+
+        assertThat(entity.isBlocked()).isFalse();
+        verify(shortUrlRepository, times(2)).save(entity);
+        verify(eventPublisher, times(2)).publishEvent(any(Object.class));
     }
 
     @Test

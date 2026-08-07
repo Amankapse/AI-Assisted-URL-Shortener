@@ -42,6 +42,9 @@ public class ShortUrlEntity {
     @Column(nullable = false)
     private boolean deleted = false;
 
+    @Column(nullable = false)
+    private boolean blocked = false;
+
     @Column(name = "click_count", nullable = false)
     private long clickCount = 0;
 
@@ -132,6 +135,14 @@ public class ShortUrlEntity {
 
     public void setDeleted(boolean deleted) {
         this.deleted = deleted;
+    }
+
+    public boolean isBlocked() {
+        return blocked;
+    }
+
+    public void setBlocked(boolean blocked) {
+        this.blocked = blocked;
     }
 
     public long getClickCount() {

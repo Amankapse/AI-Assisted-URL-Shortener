@@ -6,6 +6,13 @@ This directory contains the detailed evidence for the AI-Assisted URL Shortener 
 
 - [Architecture overview](architecture/architecture-overview.md)
 - [Component diagram](architecture/component-diagram.md)
+- [Hyperscale evolution](architecture/hyperscale-evolution.md)
+- [Capacity model](architecture/capacity-model.md)
+- [Storage strategy](architecture/storage-strategy.md)
+- [Analytics scale evolution](architecture/analytics-scale-evolution.md)
+- [Availability and SLO](architecture/availability-slo.md)
+- [Data lifecycle](architecture/data-lifecycle.md)
+- [Cost model](architecture/cost-model.md)
 - [Create URL sequence](architecture/sequence-create-url.md)
 - [Redirect sequence](architecture/sequence-redirect.md)
 - [Authentication sequence](architecture/sequence-authentication.md)
@@ -40,6 +47,7 @@ This directory contains the detailed evidence for the AI-Assisted URL Shortener 
 
 - [Normalized requirements](requirements/normalized-requirements.md)
 - [Non-functional requirements](requirements/non-functional-requirements.md)
+- [Hyperscale NFRs](requirements/hyperscale-nfr.md)
 - [Assumptions](requirements/assumptions.md)
 - [Acceptance criteria](requirements/acceptance-criteria.md)
 - [Greenfield scenario](scenarios/01-greenfield.md)

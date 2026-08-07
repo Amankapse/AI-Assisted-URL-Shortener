@@ -66,6 +66,7 @@ class RepositoryIntegrationTests {
                 "idx_short_urls_short_code",
                 "idx_short_urls_owner_id",
                 "idx_short_urls_enabled_expires_at",
+                "idx_short_urls_blocked",
                 "idx_click_events_url_id",
                 "idx_click_events_clicked_at",
                 "idx_refresh_tokens_user_id",
@@ -104,16 +105,32 @@ class RepositoryIntegrationTests {
         UserEntity owner = userRepository.saveAndFlush(user("owner@example.com"));
         UserEntity other = userRepository.saveAndFlush(user("other@example.com"));
         ShortUrlEntity first = shortUrlRepository.saveAndFlush(shortUrl("ABC1234", "https://example.com/a", owner));
+        ShortUrlEntity legacy = shortUrlRepository.saveAndFlush(shortUrl("LEGACY7", "https://example.com/legacy", owner));
         shortUrlRepository.saveAndFlush(shortUrl("DEF5678", "https://example.com/b", owner));
         shortUrlRepository.saveAndFlush(shortUrl("GHI9012", "https://example.com/c", other));
 
         assertThat(shortUrlRepository.findByOwner(owner, PageRequest.of(0, 1)).getContent()).hasSize(1);
-        assertThat(shortUrlRepository.findByOwner(owner, PageRequest.of(0, 10)).getTotalElements()).isEqualTo(2);
+        assertThat(shortUrlRepository.findByOwner(owner, PageRequest.of(0, 10)).getTotalElements()).isEqualTo(3);
         assertThat(shortUrlRepository.findByOwner(other, PageRequest.of(0, 10)).getTotalElements()).isEqualTo(1);
         assertThat(shortUrlRepository.findByShortCode("ABC1234"))
                 .map(ShortUrlEntity::getId)
                 .contains(first.getId());
+        assertThat(shortUrlRepository.findByShortCode("LEGACY7"))
+                .map(ShortUrlEntity::getId)
+                .contains(legacy.getId());
         assertThat(shortUrlRepository.findByIdAndOwner(first.getId(), other)).isEmpty();
+    }
+
+    @Test
+    void shouldPersistBlockedModerationState() {
+        UserEntity owner = userRepository.saveAndFlush(user("owner@example.com"));
+        ShortUrlEntity entity = shortUrlRepository.saveAndFlush(shortUrl("BLOCKED1", "https://example.com/a", owner));
+
+        entity.setBlocked(true);
+        shortUrlRepository.saveAndFlush(entity);
+
+        assertThat(shortUrlRepository.findById(entity.getId())).map(ShortUrlEntity::isBlocked).contains(true);
+        assertThat(shortUrlRepository.countActiveByOwner(owner)).isZero();
     }
 
     @Test

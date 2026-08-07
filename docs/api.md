@@ -24,12 +24,23 @@ Access tokens are RS256 JWTs with `sub` as the internal user UUID plus `email`, 
 - `GET /r/{shortCode}`: public redirect endpoint.
 - `GET /v3/api-docs`: generated OpenAPI document.
 
+Generated short codes are configurable and default to 8-character cryptographically random Base62 values. Existing 7-character short codes remain valid and are not rewritten.
+
+Quota failures return RFC7807 `quota-exceeded` responses with HTTP 403. Quotas are resource allowances; rate limits are request-velocity controls and continue to use HTTP 429.
+
 ## Admin analytics endpoints
 
 - `GET /api/v1/admin/analytics/overview`: return aggregate user, link, state, and redirect counts. Requires `ROLE_ADMIN`.
 - `GET /api/v1/admin/analytics/top-links?limit={n}`: return top redirected short codes. Requires `ROLE_ADMIN`; `limit` is bounded by configuration.
 
 Admin analytics endpoints do not grant `ADMIN` bypass access to normal user URL APIs.
+
+## Admin moderation endpoints
+
+- `POST /api/v1/admin/urls/{id}/block`: administratively block a URL. Requires `ROLE_ADMIN`; idempotent; returns 204.
+- `POST /api/v1/admin/urls/{id}/unblock`: remove administrative block. Requires `ROLE_ADMIN`; idempotent; returns 204.
+
+Blocked links return safe not-found behavior on redirect. Owners cannot remove administrative blocks through normal user enable endpoints. Analytics history is retained.
 
 ## Operational endpoints
 
@@ -46,7 +57,7 @@ Authenticated URL management uses `SecurityCurrentOwnerProvider` to build `Owner
 
 ## Redirect cache and analytics privacy
 
-Redirect cache keys use `url:v1:redirect:{shortCode}`. Cache values contain only a schema version, URL ID, destination URL, enabled flag, expiration timestamp, and deleted state. Redis does not store JPA entities, auth state, owner data, tokens, headers, cookies, or personal data.
+Redirect cache keys use `url:v1:redirect:{shortCode}`. Cache values contain only a schema version, URL ID, destination URL, enabled flag, expiration timestamp, deleted state, and blocked state. Redis does not store JPA entities, auth state, owner data, tokens, headers, cookies, or personal data.
 
 Valid redirects enqueue a best-effort analytics event. Stored event metadata is sanitized: IP addresses are HMAC-SHA-256 hashed with the configured pepper, referrers are reduced to host, user agents are normalized to category, and correlation IDs are bounded safe values.
 

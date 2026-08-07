@@ -77,6 +77,9 @@ public class RedirectService {
         if (target.deleted()) {
             throw new BadRequestException("Short URL has been deleted");
         }
+        if (target.blocked()) {
+            throw new ResourceNotFoundException("Short URL not found");
+        }
         if (!target.enabled()) {
             throw new BadRequestException("Short URL is disabled");
         }
@@ -92,6 +95,9 @@ public class RedirectService {
         String message = ex.getMessage() == null ? "" : ex.getMessage().toLowerCase(java.util.Locale.ROOT);
         if (message.contains("deleted")) {
             return "deleted";
+        }
+        if (message.contains("blocked")) {
+            return "blocked";
         }
         if (message.contains("disabled")) {
             return "disabled";

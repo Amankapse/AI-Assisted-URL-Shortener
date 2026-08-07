@@ -122,6 +122,16 @@ class RedirectServiceTests {
         verify(analyticsPublisher, never()).publish(any(), any());
     }
 
+    @Test
+    void blockedUrlShouldReturnSafeNotFoundAndNotPublishAnalytics() {
+        RedirectTarget target = new RedirectTarget(UUID.randomUUID(), "abc1234", "https://example.com", true, LocalDateTime.of(2026, 8, 8, 0, 0), false, true);
+        when(cacheService.get("abc1234")).thenReturn(Optional.of(target));
+
+        assertThatThrownBy(() -> redirectService.resolve("abc1234", request))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(analyticsPublisher, never()).publish(any(), any());
+    }
+
     private RedirectTarget target(String shortCode, LocalDateTime expiresAt, boolean enabled) {
         return new RedirectTarget(UUID.randomUUID(), shortCode, "https://example.com", enabled, expiresAt, false);
     }

@@ -110,7 +110,7 @@ public class RedirectCacheService {
     }
 
     public Duration ttlFor(RedirectTarget target) {
-        Duration base = target.enabled() && !target.deleted() ? properties.getTtl() : properties.getIneligibleTtl();
+        Duration base = target.enabled() && !target.deleted() && !target.blocked() ? properties.getTtl() : properties.getIneligibleTtl();
         if (target.expiresAt() != null) {
             Duration remaining = Duration.between(LocalDateTime.now(clock), target.expiresAt());
             if (remaining.compareTo(base) < 0) {

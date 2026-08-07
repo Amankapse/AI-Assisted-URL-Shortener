@@ -14,6 +14,8 @@ class AppMetricsTests {
 
         metrics.urlCreated();
         metrics.urlCreationFailed("alias_conflict");
+        metrics.shortCodeGeneration("collision_retry");
+        metrics.quota("daily_creations", "rejected");
         metrics.redirect("success");
         metrics.cache("lookup", "hit");
         metrics.singleFlight("wait");
@@ -22,6 +24,8 @@ class AppMetricsTests {
 
         assertThat(counter(registry, "url_shortener.urls", "operation", "create", "outcome", "success")).isEqualTo(1.0);
         assertThat(counter(registry, "url_shortener.urls", "operation", "create", "outcome", "failure", "reason", "alias_conflict")).isEqualTo(1.0);
+        assertThat(counter(registry, "url_shortener.short_code.generation", "outcome", "collision_retry")).isEqualTo(1.0);
+        assertThat(counter(registry, "url_shortener.quota", "quota", "daily_creations", "outcome", "rejected")).isEqualTo(1.0);
         assertThat(counter(registry, "url_shortener.redirects", "outcome", "success")).isEqualTo(1.0);
         assertThat(counter(registry, "url_shortener.redis.cache", "operation", "lookup", "outcome", "hit")).isEqualTo(1.0);
         assertThat(counter(registry, "url_shortener.redis.singleflight", "outcome", "wait")).isEqualTo(1.0);

@@ -16,6 +16,8 @@ Spring Security was chosen over a custom authentication filter so JWT validation
 
 Analytics are asynchronous and bounded so public redirect latency is protected. This deliberately trades perfect analytics completeness for service availability under pressure.
 
+Hyperscale evolution was handled as incremental production hardening, not a rewrite. The implemented baseline now includes configurable 8-character Base62 short-code generation, bounded collision retries with low-cardinality metrics, config-driven URL quotas, V4 administrative blocking, and blocked-cache invalidation. Distributed URL storage, Redis Cluster, CDN/edge routing, WAF, durable event streams, analytical warehouses, and multi-region deployment are documented as future production architecture only.
+
 ## Greenfield Scenario
 
 The greenfield work decomposed the shortener into domain entities, repositories, services, DTOs, validation, controllers, migrations, tests, and documentation. AI assistance was used to draft initial structures and tests, but output was reviewed against the modular-monolith rules, security constraints, and PostgreSQL/Flyway requirements.
@@ -31,6 +33,8 @@ Redis caching added cache-aside redirect lookup, bounded TTLs, schema-versioned 
 Analytics added sanitized click events, queue bounds, retry behavior, owner analytics, admin analytics, and soft delete to preserve history. Risks included privacy leakage, queue saturation, write amplification, and foreign-key conflicts; tests covered sanitization, persistence, overload, authorization, and soft-delete behavior.
 
 Phase 5 added observability, rate limiting, correlation IDs, health behavior, and security hardening without changing business behavior. Risks included high-cardinality metrics, excessive Actuator exposure, unsafe rate-limit failure modes, and readiness tied to Redis. Tests and documentation closed those risks.
+
+The hyperscale evolution added short-code namespace headroom, collision metrics, quota checks, and moderation blocking while keeping the existing public user URL APIs backward compatible. Existing 7-character short codes still resolve; new generated codes default to 8 characters.
 
 ## Ambiguous Scenario
 
@@ -51,6 +55,8 @@ Phase 5 added observability, rate limiting, correlation IDs, health behavior, an
 
 The implementation intentionally stopped short of claiming enterprise deployment features that are not present, such as multi-region operation, Kubernetes manifests, external secret-manager integration, or durable event streaming.
 
+The 100M-new-URLs/day requirement was treated as an architecture target. The local prototype is not represented as meeting that volume; the documentation separates the current baseline from future distributed stores, edge routing, event streaming, and global infrastructure.
+
 ## AI-Assisted Engineering
 
 AI was used to transform requirements into structured specs, propose implementation slices, draft code and tests, and prepare documentation. Human review accepted, edited, or rejected outputs based on correctness, security, maintainability, and scope control.
@@ -66,12 +72,14 @@ Edited examples:
 - Ownership evolved from a Phase 2 placeholder provider to `SecurityCurrentOwnerProvider` backed by JWT subject while preserving the `CurrentOwnerProvider` abstraction.
 - Flyway validation was corrected by adding `flyway-database-postgresql` after identifying that PostgreSQL support is separated from Flyway core.
 - URL creation metrics were adjusted to avoid double-counting custom alias conflicts.
+- Hyperscale output was edited to keep only safe local changes in code while documenting CDN, WAF, Kafka/Kinesis/Pulsar, Redis Cluster, and distributed KV stores as future architecture.
 
 Rejected examples:
 
 - Invalid `org.testcontainers:redis` dependency; replaced with `GenericContainer<>("redis:7-alpine")`.
 - A custom JWT filter approach; replaced with Spring Security resource server support and `NimbusJwtDecoder`.
 - Redis readiness dependency; rejected because Redis is not required for correctness and would cause bad orchestration behavior.
+- Switching to MD5 truncation, sequential public IDs, or Hashids as a security mechanism was rejected for short-code generation.
 
 Traceability is maintained in `docs/ai-assisted-engineering/`.
 
@@ -85,7 +93,8 @@ The implementation chose simpler, safer approaches where appropriate:
 - Single-flight is in-process and documented rather than pretending to solve cross-node stampedes.
 - Security is deny-by-default, with explicit public endpoints and explicit admin endpoints.
 - Metrics avoid user IDs, URL IDs, short codes, emails, IP addresses, token IDs, and exception messages as tags.
-- No Phase 6 feature work was added.
+- The shortcode default moved to 8-character random Base62 rather than sequential public IDs, MD5 truncation, or Hashids-as-security.
+- Moderation is represented as `blocked` alongside existing enabled/deleted/expiration state rather than replacing lifecycle with a broad enum migration.
 
 ## Validation
 
@@ -96,7 +105,7 @@ Final release validation includes:
 - `docker compose config`
 - PostgreSQL Testcontainers
 - Redis Testcontainers
-- Flyway V1, V2, V3 validation and application
+- Flyway V1, V2, V3, V4 validation and application
 - Hibernate schema validation
 - JaCoCo coverage report generation
 - GitHub Actions workflow definition
@@ -104,11 +113,11 @@ Final release validation includes:
 
 Final local results:
 
-- Tests: 72 passing
-- Line coverage: 83.91%
-- Branch coverage: 63.25%
+- Tests: 84 passing
+- Line coverage: 85.52%
+- Branch coverage: 66.49%
 - Docker: PostgreSQL and Redis Testcontainers started successfully
-- Migrations: Flyway V1, V2, and V3 validated and applied
+- Migrations: Flyway V1, V2, V3, and V4 validated and applied
 - Schema: Hibernate validation succeeded
 - Compose: `docker compose config` passed without warnings
 
@@ -126,6 +135,7 @@ Known limitations:
 - Registration duplicate behavior can reveal that an email already exists.
 - CI workflow must be verified remotely after the branch is pushed.
 - Local load testing was not executed because k6 was unavailable.
+- The local implementation does not include CDN/edge routing, WAF, Redis Cluster, distributed URL storage, Kafka/Kinesis/Pulsar, OLAP analytics warehouse, or multi-region infrastructure.
 
 ## Production Evolution
 
@@ -133,6 +143,8 @@ At enterprise scale, the next evolution would include:
 
 - managed PostgreSQL with backups, PITR, replicas, and migration runbooks
 - managed Redis with authentication, TLS, monitoring, and eviction policies
+- distributed URL mapping store for hyperscale short-code lookups
+- CDN/edge routing, WAF, and global load balancing for the redirect path
 - external secret manager for RSA keys, database credentials, Redis credentials, analytics pepper, and rate-limit salt
 - centralized logs, metrics, traces, dashboards, and alerts
 - durable event broker for analytics ingestion

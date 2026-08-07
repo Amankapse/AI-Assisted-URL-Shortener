@@ -95,6 +95,15 @@ class RedirectCacheServiceTests {
     }
 
     @Test
+    void blockedTargetShouldUseIneligibleTtlAndRoundTripThroughCacheDto() {
+        properties.setIneligibleTtl(Duration.ofSeconds(20));
+        RedirectTarget blocked = new RedirectTarget(UUID.randomUUID(), "abc1234", "https://example.com", true, LocalDateTime.of(2026, 8, 8, 0, 0), false, true);
+
+        assertThat(cacheService.ttlFor(blocked)).isEqualTo(Duration.ofSeconds(20));
+        assertThat(RedirectCacheEntry.fromTarget(blocked).toTarget().blocked()).isTrue();
+    }
+
+    @Test
     void cacheKeyShouldContainNoSensitiveData() {
         assertThat(cacheService.key("abc1234")).isEqualTo("url:v1:redirect:abc1234");
         assertThat(cacheService.key("abc1234")).doesNotContain("Bearer", "refresh", "owner", "@");

@@ -89,6 +89,16 @@ public class ProblemDetailExceptionHandler {
                 .body(detail);
     }
 
+    @ExceptionHandler(QuotaExceededException.class)
+    public ResponseEntity<ProblemDetail> handleQuotaExceeded(QuotaExceededException ex, WebRequest request) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        detail.setTitle("Quota exceeded");
+        detail.setType(URI.create("https://example.com/problem/quota-exceeded"));
+        detail.setProperty("errorCode", ex.code());
+        detail.setProperty("correlationId", correlationId(request));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(detail);
+    }
+
     @ExceptionHandler({AuthenticationException.class, BadCredentialsException.class})
     public ResponseEntity<ProblemDetail> handleAuthentication(Exception ex, WebRequest request) {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Invalid email or password.");

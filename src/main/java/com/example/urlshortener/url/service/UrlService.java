@@ -6,6 +6,7 @@ import com.example.urlshortener.common.metrics.AppMetrics;
 import com.example.urlshortener.common.ratelimit.RateLimiterService;
 import com.example.urlshortener.redirect.cache.RedirectCacheInvalidationEvent;
 import com.example.urlshortener.redirect.service.RedirectTarget;
+import com.example.urlshortener.url.config.ShortCodeProperties;
 import com.example.urlshortener.url.dto.CreateShortUrlRequest;
 import com.example.urlshortener.url.dto.ShortUrlResponse;
 import com.example.urlshortener.url.dto.UpdateShortUrlRequest;
@@ -19,6 +20,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +37,8 @@ public class UrlService {
     private final ApplicationEventPublisher eventPublisher;
     private final RateLimiterService rateLimiter;
     private final AppMetrics metrics;
+    private final ShortCodeProperties shortCodeProperties;
+    private final UrlQuotaService quotaService;
 
     public UrlService(ShortUrlRepository shortUrlRepository,
                       UrlValidationService validationService,
@@ -43,7 +47,9 @@ public class UrlService {
                       UserRepository userRepository,
                       ApplicationEventPublisher eventPublisher,
                       RateLimiterService rateLimiter,
-                      AppMetrics metrics) {
+                      AppMetrics metrics,
+                      ShortCodeProperties shortCodeProperties,
+                      UrlQuotaService quotaService) {
         this.shortUrlRepository = shortUrlRepository;
         this.validationService = validationService;
         this.shortCodeGenerator = shortCodeGenerator;
@@ -52,6 +58,8 @@ public class UrlService {
         this.eventPublisher = eventPublisher;
         this.rateLimiter = rateLimiter;
         this.metrics = metrics;
+        this.shortCodeProperties = shortCodeProperties;
+        this.quotaService = quotaService;
     }
 
     @Transactional
@@ -63,22 +71,26 @@ public class UrlService {
             validationService.validateOriginalUrl(request.getOriginalUrl());
             validationService.validateCustomAlias(request.getCustomAlias());
             validationService.validateExpiration(request.getCustomAlias(), request.getExpiresAt());
+            quotaService.enforceCreateQuota(owner, request);
 
             String shortCode = request.getCustomAlias();
             if (shortCode != null && !shortCode.isBlank()) {
                 if (shortUrlRepository.existsByCustomAlias(shortCode) || shortUrlRepository.existsByShortCode(shortCode)) {
                     throw new BadRequestException("customAlias is already in use");
                 }
+                try {
+                    ShortUrlEntity entity = new ShortUrlEntity(UUID.randomUUID(), shortCode, request.getOriginalUrl(), request.getCustomAlias(), owner, request.getExpiresAt());
+                    ShortUrlEntity saved = shortUrlRepository.save(entity);
+                    metrics.urlCreated();
+                    return mapToResponse(saved);
+                } catch (DataIntegrityViolationException ex) {
+                    throw new BadRequestException("customAlias is already in use");
+                }
             } else {
-                shortCode = generateUniqueShortCode();
+                return createWithGeneratedCode(request, owner);
             }
-
-            ShortUrlEntity entity = new ShortUrlEntity(UUID.randomUUID(), shortCode, request.getOriginalUrl(), request.getCustomAlias(), owner, request.getExpiresAt());
-            ShortUrlEntity saved = shortUrlRepository.save(entity);
-            metrics.urlCreated();
-            return mapToResponse(saved);
         } catch (BadRequestException ex) {
-            metrics.urlCreationFailed("customAlias is already in use".equals(ex.getMessage()) ? "alias_conflict" : "validation");
+            metrics.urlCreationFailed(failureReason(ex));
             throw ex;
         } catch (RuntimeException ex) {
             metrics.urlCreationFailed("error");
@@ -140,6 +152,9 @@ public class UrlService {
         UserEntity owner = ownerReference(currentOwnerProvider.getCurrentOwner());
         ShortUrlEntity entity = shortUrlRepository.findByIdAndOwner(id, owner)
                 .orElseThrow(() -> new ResourceNotFoundException("Short URL not found"));
+        if (entity.isBlocked()) {
+            throw new BadRequestException("Blocked short URLs cannot be enabled by the owner");
+        }
         entity.setEnabled(true);
         ShortUrlResponse response = mapToResponse(shortUrlRepository.save(entity));
         eventPublisher.publishEvent(new RedirectCacheInvalidationEvent(entity.getShortCode()));
@@ -157,14 +172,59 @@ public class UrlService {
         return RedirectTarget.fromEntity(resolveByShortCode(shortCode));
     }
 
-    private String generateUniqueShortCode() {
-        for (int attempt = 0; attempt < 5; attempt++) {
+    @Transactional
+    public void block(UUID id) {
+        ShortUrlEntity entity = shortUrlRepository.findById(id)
+                .filter(url -> !url.isDeleted())
+                .orElseThrow(() -> new ResourceNotFoundException("Short URL not found"));
+        if (!entity.isBlocked()) {
+            entity.setBlocked(true);
+            shortUrlRepository.save(entity);
+            eventPublisher.publishEvent(new RedirectCacheInvalidationEvent(entity.getShortCode()));
+        }
+    }
+
+    @Transactional
+    public void unblock(UUID id) {
+        ShortUrlEntity entity = shortUrlRepository.findById(id)
+                .filter(url -> !url.isDeleted())
+                .orElseThrow(() -> new ResourceNotFoundException("Short URL not found"));
+        if (entity.isBlocked()) {
+            entity.setBlocked(false);
+            shortUrlRepository.save(entity);
+            eventPublisher.publishEvent(new RedirectCacheInvalidationEvent(entity.getShortCode()));
+        }
+    }
+
+    private ShortUrlResponse createWithGeneratedCode(CreateShortUrlRequest request, UserEntity owner) {
+        for (int attempt = 0; attempt < shortCodeProperties.getMaxRetries(); attempt++) {
             String candidate = shortCodeGenerator.generate();
-            if (!shortUrlRepository.existsByShortCode(candidate)) {
-                return candidate;
+            if (shortUrlRepository.existsByShortCode(candidate)) {
+                metrics.shortCodeGeneration("collision_retry");
+                continue;
+            }
+            try {
+                ShortUrlEntity entity = new ShortUrlEntity(UUID.randomUUID(), candidate, request.getOriginalUrl(), null, owner, request.getExpiresAt());
+                ShortUrlEntity saved = shortUrlRepository.save(entity);
+                metrics.shortCodeGeneration("success");
+                metrics.urlCreated();
+                return mapToResponse(saved);
+            } catch (DataIntegrityViolationException ex) {
+                metrics.shortCodeGeneration("collision_retry");
             }
         }
+        metrics.shortCodeGeneration("retry_exhausted");
         throw new BadRequestException("Unable to generate unique short code after retries");
+    }
+
+    private String failureReason(BadRequestException ex) {
+        if ("customAlias is already in use".equals(ex.getMessage())) {
+            return "alias_conflict";
+        }
+        if (ex.getMessage() != null && ex.getMessage().contains("Unable to generate unique short code")) {
+            return "short_code_retry_exhausted";
+        }
+        return "validation";
     }
 
     private ShortUrlResponse mapToResponse(ShortUrlEntity entity) {

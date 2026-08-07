@@ -107,3 +107,12 @@ app:
         limit: ${APP_RATE_LIMIT_ADMIN_ANALYTICS_LIMIT:120}
         window: ${APP_RATE_LIMIT_ADMIN_ANALYTICS_WINDOW:1m}
         fail-open: true
+shortener:
+  code:
+    length: ${SHORTENER_CODE_LENGTH:8}
+    max-retries: ${SHORTENER_CODE_MAX_RETRIES:5}
+  quota:
+    enabled: ${SHORTENER_QUOTA_ENABLED:true}
+    daily-creations-per-user: ${SHORTENER_QUOTA_DAILY_CREATIONS_PER_USER:10000}
+    max-active-links-per-user: ${SHORTENER_QUOTA_MAX_ACTIVE_LINKS_PER_USER:100000}
+    daily-custom-aliases-per-user: ${SHORTENER_QUOTA_DAILY_CUSTOM_ALIASES_PER_USER:1000}

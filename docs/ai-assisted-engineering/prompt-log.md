@@ -23,6 +23,7 @@ This document records the major prompts used during AI-assisted planning and imp
 | P-017 | Phase 5 operational readiness | Implement approved observability, Redis Lua rate limiting, health/readiness, security hardening, k6 scripts, and operations documentation without new business features | Added bounded Micrometer metrics, correlation IDs, protected Actuator metrics, Redis Lua limiter policies, security headers, production analytics pepper validation, k6 scripts, tests, and docs | Accepted |
 | P-018 | Phase 6 release readiness | Finalize CI/CD, quality evidence, documentation, dependency/secret audit, coverage, and submission summary without product changes | Added JaCoCo reporting, expanded GitHub Actions, removed obsolete Compose version, rewrote README, added final engineering summary and release checklist, updated traceability | Edited |
 | P-019 | Final documentation synchronization | Perform final README and documentation synchronization pass without feature work | Reconciled README, docs index, stale phase language, coverage values, local startup instructions, and k6 request schema | Edited |
+| P-020 | Hyperscale production evolution | Evolve the validated baseline toward 100M new URLs/day without rewriting or adding distributed infrastructure | Added hyperscale NFR/capacity/architecture docs, configurable 8-character Base62 generation, collision metrics, config-driven quotas, V4 blocked moderation, admin block/unblock, tests, and traceability | Edited |
 
 ## P-013 Validation Notes
 
@@ -195,6 +196,43 @@ AI-generated coverage references were edited after rerunning JaCoCo so the repos
 ### Rejected
 
 Claiming Docker Compose starts the full application was rejected. The README now states that `compose.yaml` starts PostgreSQL and Redis infrastructure only, while the Spring Boot application is started separately through the Maven wrapper.
+
+## P-020 Validation Notes
+
+- Scope: hyperscale production evolution as an incremental change to the validated baseline.
+- Implemented now:
+  - Config-driven short-code generation using `shortener.code.length=8` and `shortener.code.max-retries=5`.
+  - Cryptographically secure Base62 generation retained.
+  - Existing 7-character short-code resolution preserved; no historical short codes are rewritten.
+  - Bounded collision retries now emit low-cardinality metrics for success, retry, and exhaustion.
+  - Config-driven `UrlQuotaService` added for daily creations, active links, and daily custom aliases.
+  - Flyway V4 added `short_urls.blocked BOOLEAN NOT NULL DEFAULT FALSE` plus an index.
+  - Admin block/unblock endpoints added under `/api/v1/admin/urls/{id}`.
+  - Redirect cache DTO includes blocked state; blocked redirects return safe not-found behavior.
+- Intentionally deferred as architecture-only:
+  - Distributed URL mapping store, Redis Cluster, CDN/edge routing, WAF/global load balancer, durable event stream, OLAP warehouse, multi-AZ/multi-region deployment, and external malware/phishing provider.
+- Validation:
+  - `.\mvnw.cmd clean verify` passed with 84 tests.
+  - PostgreSQL and Redis Testcontainers started successfully.
+  - Flyway validated and applied V1, V2, V3, and V4.
+  - Hibernate schema validation succeeded.
+  - JaCoCo generated line coverage 85.52% and branch coverage 66.49%.
+  - `.\mvnw.cmd dependency:tree` passed and confirmed no new production dependency was added.
+  - `docker compose config` passed without warnings.
+
+## P-020 AI Output Examples
+
+### Accepted
+
+The AI-generated separation between implemented baseline and architecture-only hyperscale components was accepted because it prevents false claims about CDN, Kafka, Redis Cluster, distributed KV storage, WAF, and multi-region infrastructure.
+
+### Edited
+
+The moderation model was narrowed to a `blocked` boolean instead of a lifecycle enum replacement. This preserved existing enabled, deleted, and expiration behavior while adding the approved abuse-control state.
+
+### Rejected
+
+Switching short-code generation to MD5 truncation, sequential public IDs, or Hashids-as-security was rejected. The implementation retained cryptographically secure random Base62 codes and the PostgreSQL unique constraint as the final concurrency-safe authority.
 
 ## AI was wrong example
 

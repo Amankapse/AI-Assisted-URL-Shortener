@@ -14,6 +14,7 @@ This repository contains a production-oriented URL shortener implemented with Ja
 - CSRF protection for refresh/logout cookie flows
 - URL creation with optional custom aliases
 - Expiration, enable/disable, and soft deletion
+- Administrative URL blocking for abuse moderation
 - Owner-scoped URL management without client-supplied owner IDs
 - Public redirect endpoint
 - Redis cache-aside redirect lookup
@@ -22,6 +23,7 @@ This repository contains a production-oriented URL shortener implemented with Ja
 - Click analytics with sanitized metadata
 - Owner analytics and explicit admin analytics
 - Redis Lua rate limiting
+- Config-driven URL quotas
 - Micrometer metrics and Spring Boot Actuator
 - Correlation IDs
 - Health, liveness, and readiness probes
@@ -150,6 +152,12 @@ Use [.env.example](.env.example) as a variable-name template only. Do not commit
 | `APP_RATE_LIMIT_REDIRECT_WINDOW` | No | Public redirect window | `1m` |
 | `APP_RATE_LIMIT_ADMIN_ANALYTICS_LIMIT` | No | Admin analytics limit | `120` |
 | `APP_RATE_LIMIT_ADMIN_ANALYTICS_WINDOW` | No | Admin analytics window | `1m` |
+| `SHORTENER_CODE_LENGTH` | No | Generated Base62 short-code length | `8` |
+| `SHORTENER_CODE_MAX_RETRIES` | No | Bounded generation retry count | `5` |
+| `SHORTENER_QUOTA_ENABLED` | No | URL quota toggle | `true` |
+| `SHORTENER_QUOTA_DAILY_CREATIONS_PER_USER` | No | Daily creations per user | `10000` |
+| `SHORTENER_QUOTA_MAX_ACTIVE_LINKS_PER_USER` | No | Maximum active links per user | `100000` |
+| `SHORTENER_QUOTA_DAILY_CUSTOM_ALIASES_PER_USER` | No | Daily custom aliases per user | `1000` |
 | `SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE` | No | Hikari max pool size | `10` |
 | `SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT` | No | Hikari connection timeout ms | `30000` |
 | `SERVER_MAX_HTTP_FORM_POST_SIZE` | No | Tomcat form body limit | `2MB` |
@@ -384,8 +392,46 @@ Flyway runs automatically on application startup. PostgreSQL is authoritative an
 | `V1__initial_schema.sql` | Initial users, short URLs, click events, UUIDs, enums, indexes, constraints |
 | `V2__authentication_refresh_tokens.sql` | Refresh-token table, token digest uniqueness, family/user indexes |
 | `V3__click_analytics_indexes.sql` | Click analytics correlation ID, soft-delete support, analytics indexes |
+| `V4__url_moderation_and_hyperscale_controls.sql` | Administrative blocked state and supporting index |
 
 Migration files are in `src/main/resources/db/migration/`.
+
+# Hyperscale Evolution
+
+The current repository is the implemented, validated baseline. Hyperscale production components are documented as evolution targets, not local implementation claims.
+
+Architecture targets include:
+
+- 100,000,000 new URLs/day;
+- about 1,157 average URL creations/sec;
+- about 5,800 writes/sec at 5x peak;
+- rounded design target of 10,000 creates/sec;
+- minimum 10:1 read/write ratio;
+- rounded redirect design target of 100,000 redirects/sec;
+- 10-year retention, or about 365 billion URL records at target volume;
+- redirect availability target of 99.99%;
+- RPO <= 5 minutes and RTO <= 30 minutes as production architecture targets.
+
+Implemented in this repository:
+
+- configurable 8-character Base62 short-code generation;
+- bounded collision retries with low-cardinality metrics;
+- PostgreSQL unique constraint as the final concurrency-safe uniqueness guarantee;
+- config-driven URL quotas;
+- administrative block/unblock moderation;
+- blocked redirect cache representation and invalidation.
+
+Architecture-only future components:
+
+- distributed URL mapping store such as DynamoDB, Cassandra, ScyllaDB, Bigtable, or equivalent;
+- Redis Cluster;
+- CDN/edge redirect layer;
+- WAF/global load balancer;
+- durable event stream such as Kafka, Kinesis, Pulsar, or equivalent;
+- analytical warehouse such as ClickHouse, BigQuery, Snowflake, Druid, or equivalent;
+- multi-AZ/multi-region infrastructure.
+
+See [hyperscale NFRs](docs/requirements/hyperscale-nfr.md), [capacity model](docs/architecture/capacity-model.md), and [hyperscale evolution](docs/architecture/hyperscale-evolution.md).
 
 # Testing
 
@@ -403,14 +449,14 @@ Unix/macOS:
 ./mvnw clean verify
 ```
 
-The verified suite contains 72 tests. The build starts PostgreSQL and Redis Testcontainers automatically, runs Flyway migrations, validates Hibernate schema mappings, executes unit/integration/security/operation tests, builds the jar, and generates JaCoCo coverage.
+The verified suite contains 84 tests. The build starts PostgreSQL and Redis Testcontainers automatically, runs Flyway migrations, validates Hibernate schema mappings, executes unit/integration/security/operation tests, builds the jar, and generates JaCoCo coverage.
 
 # Coverage
 
 Current JaCoCo results:
 
-- Line coverage: 83.91%
-- Branch coverage: 63.25%
+- Line coverage: 85.52%
+- Branch coverage: 66.49%
 - Report: `target/site/jacoco/index.html`
 
 Coverage is quality evidence, not proof of correctness. See [docs/testing/coverage-summary.md](docs/testing/coverage-summary.md).
@@ -511,6 +557,7 @@ See [docs/security/authentication.md](docs/security/authentication.md) and [docs
 - No external secret manager integration in the prototype.
 - No Kubernetes deployment manifests.
 - No multi-region architecture.
+- Hyperscale distributed stores, CDN/edge, WAF, Redis Cluster, durable event streaming, OLAP warehouse, and multi-region infrastructure are documented but not implemented locally.
 - k6 scripts exist, but local load results were not measured because k6 was unavailable.
 - Remote CI status is pending until the branch is pushed and the workflow runs on GitHub.
 - No public admin provisioning flow is implemented.

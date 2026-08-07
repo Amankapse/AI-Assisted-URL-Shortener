@@ -18,6 +18,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -63,6 +64,9 @@ class UrlControllerIntegrationTests {
 
     @Autowired
     private ClickAnalyticsPublisher clickAnalyticsPublisher;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void cleanDatabase() {
@@ -295,6 +299,41 @@ class UrlControllerIntegrationTests {
     }
 
     @Test
+    void adminModerationShouldBlockUnblockAndInvalidateRedirects() throws Exception {
+        String ownerAuthorization = authorizationHeader();
+        String adminAuthorization = adminAuthorizationHeader("admin@example.com");
+        ShortUrlEntity active = createUrl("blockme1", "https://example.com/blocked", LocalDateTime.now().plusDays(1), true);
+
+        mockMvc.perform(post("/api/v1/admin/urls/{id}/block", active.getId())
+                        .header(HttpHeaders.AUTHORIZATION, ownerAuthorization))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/admin/urls/{id}/block", active.getId())
+                        .header(HttpHeaders.AUTHORIZATION, adminAuthorization))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/v1/admin/urls/{id}/block", active.getId())
+                        .header(HttpHeaders.AUTHORIZATION, adminAuthorization))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/r/{shortCode}", active.getShortCode()))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(post("/api/v1/urls/{id}/enable", active.getId())
+                        .header(HttpHeaders.AUTHORIZATION, ownerAuthorization))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", containsString("Blocked")));
+
+        mockMvc.perform(post("/api/v1/admin/urls/{id}/unblock", active.getId())
+                        .header(HttpHeaders.AUTHORIZATION, adminAuthorization))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/r/{shortCode}", active.getShortCode()))
+                .andExpect(status().isFound())
+                .andExpect(header().string(HttpHeaders.LOCATION, "https://example.com/blocked"));
+    }
+
+    @Test
     void openApiShouldExposeControllersAndHideInternalTypes() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
@@ -346,6 +385,22 @@ class UrlControllerIntegrationTests {
                         ))))
                 .andExpect(status().isCreated());
 
+        String body = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "email", email,
+                                "password", "correct-horse-password"
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        JsonNode json = objectMapper.readTree(body);
+        return "Bearer " + json.get("accessToken").asText();
+    }
+
+    private String adminAuthorizationHeader(String email) throws Exception {
+        userRepository.saveAndFlush(new UserEntity(UUID.randomUUID(), email, passwordEncoder.encode("correct-horse-password"), UserRole.ADMIN, UserStatus.ACTIVE));
         String body = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(

@@ -35,6 +35,14 @@ public class AppMetrics {
         increment("url_shortener.urls", "operation", "create", "outcome", "failure", "reason", reason);
     }
 
+    public void shortCodeGeneration(String outcome) {
+        increment("url_shortener.short_code.generation", "outcome", outcome);
+    }
+
+    public void quota(String quota, String outcome) {
+        increment("url_shortener.quota", "quota", quota, "outcome", outcome);
+    }
+
     public void redirect(String outcome) {
         increment("url_shortener.redirects", "outcome", outcome);
     }
