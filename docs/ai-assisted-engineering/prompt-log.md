@@ -246,6 +246,7 @@ Switching short-code generation to MD5 truncation, sequential public IDs, or Has
   - Reorganized `.env.example` into deployment sections with placeholders only.
   - Added Render, Neon, environment-variable, production-validation, and free-tier limitation docs.
   - Fixed `application-local.yml` profile activation from invalid `spring.profiles` to `spring.config.activate.on-profile` after the local startup smoke exposed the Spring Boot 3.5 compatibility defect.
+  - Bound `spring-boot:repackage` in `pom.xml` after Render deployment logs showed `no main manifest attribute` for `/app/app.jar`.
 - Selected mechanisms:
   - Redis/Valkey: `SPRING_DATA_REDIS_URL` for Render Key Value internal URL.
   - JWT: existing `APP_AUTH_PRIVATE_KEY_PEM` and `APP_AUTH_PUBLIC_KEY_PEM` environment PEM content; no production test-key fallback.
@@ -260,6 +261,7 @@ Switching short-code generation to MD5 truncation, sequential public IDs, or Has
   - Markdown link check passed for 54 Markdown files.
   - `docker compose up -d` started local infrastructure and a bounded local `spring-boot:run` liveness smoke passed using temporary in-memory RSA key material.
   - `docker build -t url-shortener-render-smoke .` passed.
+  - After the packaging fix, `.\mvnw.cmd clean package -DskipTests` showed `spring-boot:repackage` replacing the main artifact; manifest inspection confirmed `Main-Class: org.springframework.boot.loader.launch.JarLauncher` and `Start-Class: com.example.urlshortener.UrlShortenerApplication`; bounded `java -jar target\url-shortener-0.1.0.jar` liveness smoke passed; Docker image rebuild passed; `.\mvnw.cmd clean verify` passed with 84 tests.
 
 ## P-021 AI Output Examples
 
@@ -273,9 +275,13 @@ The initial deployment template used generic `JWT_*` names from the request. It 
 
 The local compatibility smoke exposed invalid Spring Boot 3.5 profile activation in `application-local.yml`; the config was edited to `spring.config.activate.on-profile`.
 
+Render deployment logs exposed a non-executable normal JAR. The build configuration was edited to bind `spring-boot:repackage` because this project imports Spring Boot dependency management without using `spring-boot-starter-parent`.
+
 ### Rejected
 
 Hard-coding Render or Neon hostnames, adding a new Redis client dependency, and changing Flyway migrations were rejected as outside the deployment-only scope.
+
+Changing the Docker entrypoint back to Maven `spring-boot:run` was rejected because Render runtime should execute the packaged application artifact, not run Maven in production.
 
 ## AI was wrong example
 
