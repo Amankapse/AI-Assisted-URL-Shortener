@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    url: jdbc:tc:postgresql:15-alpine:///shortener
+    username: shortener
+    password: shortener
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  data:
+    redis:
+      host: localhost
+      port: 6379
+app:
+  auth:
+    secure-cookies: false
+  analytics:
+    ip-hash-pepper: test-analytics-pepper
+  redirect:
+    cache:
+      enabled: false
