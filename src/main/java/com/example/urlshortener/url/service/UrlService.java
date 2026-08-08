@@ -1,14 +1,25 @@
 package com.example.urlshortener.url.service;
 
+import com.example.urlshortener.audit.entity.AuditAction;
+import com.example.urlshortener.audit.entity.AuditActorType;
+import com.example.urlshortener.audit.entity.AuditResourceType;
+import com.example.urlshortener.audit.service.AuditService;
 import com.example.urlshortener.common.exception.BadRequestException;
+import com.example.urlshortener.common.exception.PreconditionFailedException;
 import com.example.urlshortener.common.exception.ResourceNotFoundException;
 import com.example.urlshortener.common.metrics.AppMetrics;
 import com.example.urlshortener.common.ratelimit.RateLimiterService;
+import com.example.urlshortener.outbox.domain.DomainEvent;
+import com.example.urlshortener.outbox.domain.DomainEventPublisher;
+import com.example.urlshortener.outbox.domain.OutboxEventType;
+import com.example.urlshortener.outbox.payload.UrlCacheInvalidationPayloadV1;
+import com.example.urlshortener.outbox.payload.UrlStateChangedPayloadV1;
 import com.example.urlshortener.redirect.cache.RedirectCacheInvalidationEvent;
 import com.example.urlshortener.redirect.service.RedirectTarget;
 import com.example.urlshortener.url.config.ShortCodeProperties;
 import com.example.urlshortener.url.dto.CreateShortUrlRequest;
 import com.example.urlshortener.url.dto.ShortUrlResponse;
+import com.example.urlshortener.url.dto.UpdateDestinationRequest;
 import com.example.urlshortener.url.dto.UpdateShortUrlRequest;
 import com.example.urlshortener.url.entity.ShortUrlEntity;
 import com.example.urlshortener.url.repository.ShortUrlRepository;
@@ -16,6 +27,8 @@ import com.example.urlshortener.user.entity.UserEntity;
 import com.example.urlshortener.user.repository.UserRepository;
 import com.example.urlshortener.user.service.CurrentOwnerProvider;
 import com.example.urlshortener.user.service.OwnerIdentity;
+import com.example.urlshortener.workspace.service.WorkspaceContext;
+import com.example.urlshortener.workspace.service.WorkspaceContextResolver;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -39,6 +52,10 @@ public class UrlService {
     private final AppMetrics metrics;
     private final ShortCodeProperties shortCodeProperties;
     private final UrlQuotaService quotaService;
+    private final PublicUrlBuilder publicUrlBuilder;
+    private final WorkspaceContextResolver workspaceContextResolver;
+    private final AuditService auditService;
+    private final DomainEventPublisher domainEventPublisher;
 
     public UrlService(ShortUrlRepository shortUrlRepository,
                       UrlValidationService validationService,
@@ -49,7 +66,11 @@ public class UrlService {
                       RateLimiterService rateLimiter,
                       AppMetrics metrics,
                       ShortCodeProperties shortCodeProperties,
-                      UrlQuotaService quotaService) {
+                      UrlQuotaService quotaService,
+                      PublicUrlBuilder publicUrlBuilder,
+                      WorkspaceContextResolver workspaceContextResolver,
+                      AuditService auditService,
+                      DomainEventPublisher domainEventPublisher) {
         this.shortUrlRepository = shortUrlRepository;
         this.validationService = validationService;
         this.shortCodeGenerator = shortCodeGenerator;
@@ -60,18 +81,32 @@ public class UrlService {
         this.metrics = metrics;
         this.shortCodeProperties = shortCodeProperties;
         this.quotaService = quotaService;
+        this.publicUrlBuilder = publicUrlBuilder;
+        this.workspaceContextResolver = workspaceContextResolver;
+        this.auditService = auditService;
+        this.domainEventPublisher = domainEventPublisher;
     }
 
     @Transactional
     public ShortUrlResponse create(CreateShortUrlRequest request) {
-        OwnerIdentity identity = currentOwnerProvider.getCurrentOwner();
-        rateLimiter.enforce("url-create", identity.userId().toString());
-        UserEntity owner = ownerReference(identity);
+        return create(request, (String) null);
+    }
+
+    @Transactional
+    public ShortUrlResponse create(CreateShortUrlRequest request, String workspaceHeader) {
+        WorkspaceContext workspace = workspaceContextResolver.resolveForLinkWriter(workspaceHeader);
+        return create(request, workspace);
+    }
+
+    @Transactional
+    public ShortUrlResponse create(CreateShortUrlRequest request, WorkspaceContext workspace) {
+        rateLimiter.enforce("url-create", workspace.actorType() + ":" + workspace.actorId());
+        UserEntity owner = ownerReference(workspace);
         try {
             validationService.validateOriginalUrl(request.getOriginalUrl());
             validationService.validateCustomAlias(request.getCustomAlias());
             validationService.validateExpiration(request.getCustomAlias(), request.getExpiresAt());
-            quotaService.enforceCreateQuota(owner, request);
+            quotaService.enforceCreateQuota(workspace.workspaceId(), request);
 
             String shortCode = request.getCustomAlias();
             if (shortCode != null && !shortCode.isBlank()) {
@@ -79,15 +114,17 @@ public class UrlService {
                     throw new BadRequestException("customAlias is already in use");
                 }
                 try {
-                    ShortUrlEntity entity = new ShortUrlEntity(UUID.randomUUID(), shortCode, request.getOriginalUrl(), request.getCustomAlias(), owner, request.getExpiresAt());
+                    ShortUrlEntity entity = new ShortUrlEntity(UUID.randomUUID(), shortCode, request.getOriginalUrl(), request.getCustomAlias(), owner, workspace.workspace(), request.getExpiresAt());
                     ShortUrlEntity saved = shortUrlRepository.save(entity);
+                    recordActor(AuditAction.URL_CREATED, workspace, saved.getId(), auditService.urlCreatedMetadata(true, saved.getExpiresAt() != null));
+                    publishUrlMutation(OutboxEventType.URL_CREATED, saved, workspace, "CREATED");
                     metrics.urlCreated();
                     return mapToResponse(saved);
                 } catch (DataIntegrityViolationException ex) {
                     throw new BadRequestException("customAlias is already in use");
                 }
             } else {
-                return createWithGeneratedCode(request, owner);
+                return createWithGeneratedCode(request, owner, workspace);
             }
         } catch (BadRequestException ex) {
             metrics.urlCreationFailed(failureReason(ex));
@@ -100,63 +137,130 @@ public class UrlService {
 
     @Transactional(readOnly = true)
     public ShortUrlResponse get(UUID id) {
-        UserEntity owner = ownerReference(currentOwnerProvider.getCurrentOwner());
-        ShortUrlEntity entity = shortUrlRepository.findByIdAndOwner(id, owner)
+        return get(id, null);
+    }
+
+    @Transactional(readOnly = true)
+    public ShortUrlResponse get(UUID id, String workspaceHeader) {
+        WorkspaceContext workspace = workspaceContextResolver.resolveForLinkReader(workspaceHeader);
+        ShortUrlEntity entity = shortUrlRepository.findByIdAndWorkspaceId(id, workspace.workspaceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Short URL not found"));
         return mapToResponse(entity);
     }
 
     @Transactional(readOnly = true)
     public Page<ShortUrlResponse> list(int page, int size) {
-        UserEntity owner = ownerReference(currentOwnerProvider.getCurrentOwner());
+        return list(page, size, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ShortUrlResponse> list(int page, int size, String workspaceHeader) {
+        WorkspaceContext workspace = workspaceContextResolver.resolveForLinkReader(workspaceHeader);
         Pageable pageable = PageRequest.of(page, size);
-        return shortUrlRepository.findByOwner(owner, pageable).map(this::mapToResponse);
+        return shortUrlRepository.findByWorkspaceId(workspace.workspaceId(), pageable).map(this::mapToResponse);
     }
 
     @Transactional
     public ShortUrlResponse updateExpiration(UUID id, UpdateShortUrlRequest request) {
+        return updateExpiration(id, request, null);
+    }
+
+    @Transactional
+    public ShortUrlResponse updateExpiration(UUID id, UpdateShortUrlRequest request, String workspaceHeader) {
         validationService.validateExpiration(null, request.getExpiresAt());
-        UserEntity owner = ownerReference(currentOwnerProvider.getCurrentOwner());
-        ShortUrlEntity entity = shortUrlRepository.findByIdAndOwner(id, owner)
+        WorkspaceContext workspace = workspaceContextResolver.resolveForLinkWriter(workspaceHeader);
+        ShortUrlEntity entity = shortUrlRepository.findByIdAndWorkspaceId(id, workspace.workspaceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Short URL not found"));
+        boolean previousExpiresAtSet = entity.getExpiresAt() != null;
         entity.setExpiresAt(request.getExpiresAt());
         ShortUrlResponse response = mapToResponse(shortUrlRepository.save(entity));
+        recordActor(AuditAction.URL_EXPIRATION_CHANGED, workspace, entity.getId(), auditService.expirationChangedMetadata(previousExpiresAtSet, entity.getExpiresAt() != null));
+        publishUrlMutation(OutboxEventType.URL_EXPIRATION_CHANGED, entity, workspace, entity.isEnabled() ? "ENABLED" : "DISABLED");
+        publishCacheInvalidation(entity);
+        eventPublisher.publishEvent(new RedirectCacheInvalidationEvent(entity.getShortCode()));
+        return response;
+    }
+
+    @Transactional
+    public ShortUrlResponse updateDestination(UUID id, UpdateDestinationRequest request, long expectedVersion) {
+        return updateDestination(id, request, expectedVersion, null);
+    }
+
+    @Transactional
+    public ShortUrlResponse updateDestination(UUID id, UpdateDestinationRequest request, long expectedVersion, String workspaceHeader) {
+        validationService.validateOriginalUrl(request.getOriginalUrl());
+        WorkspaceContext workspace = workspaceContextResolver.resolveForLinkWriter(workspaceHeader);
+        ShortUrlEntity entity = shortUrlRepository.findByIdAndWorkspaceId(id, workspace.workspaceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Short URL not found"));
+        if (entity.getVersion() != expectedVersion) {
+            throw new PreconditionFailedException("If-Match header does not match the current URL version.");
+        }
+        String previousUrl = entity.getOriginalUrl();
+        entity.setOriginalUrl(request.getOriginalUrl());
+        ShortUrlResponse response = mapToResponse(shortUrlRepository.save(entity));
+        recordActor(AuditAction.URL_DESTINATION_CHANGED, workspace, entity.getId(), auditService.destinationChangedMetadata(previousUrl, entity.getOriginalUrl()));
+        publishUrlMutation(OutboxEventType.URL_DESTINATION_CHANGED, entity, workspace, "DESTINATION_CHANGED");
+        publishCacheInvalidation(entity);
         eventPublisher.publishEvent(new RedirectCacheInvalidationEvent(entity.getShortCode()));
         return response;
     }
 
     @Transactional
     public void delete(UUID id) {
-        UserEntity owner = ownerReference(currentOwnerProvider.getCurrentOwner());
-        ShortUrlEntity entity = shortUrlRepository.findByIdAndOwner(id, owner)
+        delete(id, null);
+    }
+
+    @Transactional
+    public void delete(UUID id, String workspaceHeader) {
+        WorkspaceContext workspace = workspaceContextResolver.resolveForLinkWriter(workspaceHeader);
+        ShortUrlEntity entity = shortUrlRepository.findByIdAndWorkspaceId(id, workspace.workspaceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Short URL not found"));
         entity.setDeleted(true);
         entity.setEnabled(false);
         shortUrlRepository.save(entity);
+        recordActor(AuditAction.URL_DELETED, workspace, entity.getId(), auditService.stateChangedMetadata("ACTIVE", "DELETED"));
+        publishUrlMutation(OutboxEventType.URL_DELETED, entity, workspace, "DELETED");
+        publishCacheInvalidation(entity);
         eventPublisher.publishEvent(new RedirectCacheInvalidationEvent(entity.getShortCode()));
     }
 
     @Transactional
     public ShortUrlResponse disable(UUID id) {
-        UserEntity owner = ownerReference(currentOwnerProvider.getCurrentOwner());
-        ShortUrlEntity entity = shortUrlRepository.findByIdAndOwner(id, owner)
+        return disable(id, null);
+    }
+
+    @Transactional
+    public ShortUrlResponse disable(UUID id, String workspaceHeader) {
+        WorkspaceContext workspace = workspaceContextResolver.resolveForLinkWriter(workspaceHeader);
+        ShortUrlEntity entity = shortUrlRepository.findByIdAndWorkspaceId(id, workspace.workspaceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Short URL not found"));
         entity.setEnabled(false);
         ShortUrlResponse response = mapToResponse(shortUrlRepository.save(entity));
+        recordActor(AuditAction.URL_DISABLED, workspace, entity.getId(), auditService.stateChangedMetadata("ENABLED", "DISABLED"));
+        publishUrlMutation(OutboxEventType.URL_DISABLED, entity, workspace, "DISABLED");
+        publishCacheInvalidation(entity);
         eventPublisher.publishEvent(new RedirectCacheInvalidationEvent(entity.getShortCode()));
         return response;
     }
 
     @Transactional
     public ShortUrlResponse enable(UUID id) {
-        UserEntity owner = ownerReference(currentOwnerProvider.getCurrentOwner());
-        ShortUrlEntity entity = shortUrlRepository.findByIdAndOwner(id, owner)
+        return enable(id, null);
+    }
+
+    @Transactional
+    public ShortUrlResponse enable(UUID id, String workspaceHeader) {
+        WorkspaceContext workspace = workspaceContextResolver.resolveForLinkWriter(workspaceHeader);
+        ShortUrlEntity entity = shortUrlRepository.findByIdAndWorkspaceId(id, workspace.workspaceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Short URL not found"));
         if (entity.isBlocked()) {
             throw new BadRequestException("Blocked short URLs cannot be enabled by the owner");
         }
         entity.setEnabled(true);
         ShortUrlResponse response = mapToResponse(shortUrlRepository.save(entity));
+        recordActor(AuditAction.URL_ENABLED, workspace, entity.getId(), auditService.stateChangedMetadata("DISABLED", "ENABLED"));
+        publishUrlMutation(OutboxEventType.URL_ENABLED, entity, workspace, "ENABLED");
+        publishCacheInvalidation(entity);
         eventPublisher.publishEvent(new RedirectCacheInvalidationEvent(entity.getShortCode()));
         return response;
     }
@@ -180,6 +284,16 @@ public class UrlService {
         if (!entity.isBlocked()) {
             entity.setBlocked(true);
             shortUrlRepository.save(entity);
+            auditService.recordUser(
+                    AuditAction.URL_BLOCKED,
+                    entity.getWorkspace().getId(),
+                    currentOwnerProvider.getCurrentOwner().userId(),
+                    AuditResourceType.URL,
+                    entity.getId(),
+                    auditService.stateChangedMetadata("UNBLOCKED", "BLOCKED")
+            );
+            publishUrlMutation(OutboxEventType.URL_BLOCKED, entity, AuditActorType.USER, currentOwnerProvider.getCurrentOwner().userId(), "BLOCKED");
+            publishCacheInvalidation(entity);
             eventPublisher.publishEvent(new RedirectCacheInvalidationEvent(entity.getShortCode()));
         }
     }
@@ -192,11 +306,21 @@ public class UrlService {
         if (entity.isBlocked()) {
             entity.setBlocked(false);
             shortUrlRepository.save(entity);
+            auditService.recordUser(
+                    AuditAction.URL_UNBLOCKED,
+                    entity.getWorkspace().getId(),
+                    currentOwnerProvider.getCurrentOwner().userId(),
+                    AuditResourceType.URL,
+                    entity.getId(),
+                    auditService.stateChangedMetadata("BLOCKED", "UNBLOCKED")
+            );
+            publishUrlMutation(OutboxEventType.URL_UNBLOCKED, entity, AuditActorType.USER, currentOwnerProvider.getCurrentOwner().userId(), "UNBLOCKED");
+            publishCacheInvalidation(entity);
             eventPublisher.publishEvent(new RedirectCacheInvalidationEvent(entity.getShortCode()));
         }
     }
 
-    private ShortUrlResponse createWithGeneratedCode(CreateShortUrlRequest request, UserEntity owner) {
+    private ShortUrlResponse createWithGeneratedCode(CreateShortUrlRequest request, UserEntity owner, WorkspaceContext workspace) {
         for (int attempt = 0; attempt < shortCodeProperties.getMaxRetries(); attempt++) {
             String candidate = shortCodeGenerator.generate();
             if (shortUrlRepository.existsByShortCode(candidate)) {
@@ -204,8 +328,10 @@ public class UrlService {
                 continue;
             }
             try {
-                ShortUrlEntity entity = new ShortUrlEntity(UUID.randomUUID(), candidate, request.getOriginalUrl(), null, owner, request.getExpiresAt());
+                ShortUrlEntity entity = new ShortUrlEntity(UUID.randomUUID(), candidate, request.getOriginalUrl(), null, owner, workspace.workspace(), request.getExpiresAt());
                 ShortUrlEntity saved = shortUrlRepository.save(entity);
+                recordActor(AuditAction.URL_CREATED, workspace, saved.getId(), auditService.urlCreatedMetadata(false, saved.getExpiresAt() != null));
+                publishUrlMutation(OutboxEventType.URL_CREATED, saved, workspace, "CREATED");
                 metrics.shortCodeGeneration("success");
                 metrics.urlCreated();
                 return mapToResponse(saved);
@@ -231,16 +357,70 @@ public class UrlService {
         return new ShortUrlResponse(
                 entity.getId(),
                 entity.getShortCode(),
+                publicUrlBuilder.shortUrl(entity.getShortCode()),
                 entity.getCustomAlias(),
                 entity.getOriginalUrl(),
                 entity.getCreatedAt(),
                 entity.getExpiresAt(),
                 entity.isEnabled(),
-                entity.getClickCount()
+                entity.getClickCount(),
+                entity.getVersion()
         );
     }
 
-    private UserEntity ownerReference(OwnerIdentity identity) {
-        return userRepository.getReferenceById(identity.userId());
+    private void recordActor(AuditAction action, WorkspaceContext workspace, UUID resourceId, java.util.Map<String, Object> metadata) {
+        if (workspace.actorType() == AuditActorType.API_KEY) {
+            auditService.recordApiKey(action, workspace.workspaceId(), workspace.actorId(), AuditResourceType.URL, resourceId, metadata);
+        } else {
+            auditService.recordUser(action, workspace.workspaceId(), workspace.actorId(), AuditResourceType.URL, resourceId, metadata);
+        }
+    }
+
+    private void publishUrlMutation(OutboxEventType eventType, ShortUrlEntity entity, WorkspaceContext workspace, String state) {
+        publishUrlMutation(eventType, entity, workspace.actorType(), workspace.actorId(), state);
+    }
+
+    private void publishUrlMutation(OutboxEventType eventType, ShortUrlEntity entity, AuditActorType actorType, UUID actorId, String state) {
+        domainEventPublisher.publish(new DomainEvent(
+                UUID.randomUUID(),
+                entity.getWorkspace().getId(),
+                "SHORT_URL",
+                entity.getId().toString(),
+                eventType,
+                1,
+                new UrlStateChangedPayloadV1(
+                        entity.getId(),
+                        entity.getWorkspace().getId(),
+                        entity.getShortCode(),
+                        state,
+                        actorType,
+                        actorId
+                ),
+                java.time.LocalDateTime.now()
+        ));
+    }
+
+    private void publishCacheInvalidation(ShortUrlEntity entity) {
+        domainEventPublisher.publish(new DomainEvent(
+                UUID.randomUUID(),
+                entity.getWorkspace().getId(),
+                "SHORT_URL",
+                entity.getId().toString(),
+                OutboxEventType.URL_CACHE_INVALIDATION_REQUIRED,
+                1,
+                new UrlCacheInvalidationPayloadV1(entity.getId(), entity.getShortCode()),
+                java.time.LocalDateTime.now()
+        ));
+    }
+
+    private UserEntity ownerReference(WorkspaceContext workspace) {
+        if (workspace.actorType() == AuditActorType.USER) {
+            return userRepository.getReferenceById(workspace.actorId());
+        }
+        UserEntity creator = workspace.workspace().getCreatedBy();
+        if (creator == null) {
+            throw new ResourceNotFoundException("Workspace owner not found");
+        }
+        return creator;
     }
 }

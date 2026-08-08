@@ -19,6 +19,11 @@
 - Phase 4 analytics: sanitized click metadata, bounded queue overload drops, retry behavior, idempotent batch persistence, atomic aggregate updates, owner analytics, admin analytics authorization, top-links limits, soft-delete analytics preservation, and Redis Testcontainers integration.
 - Phase 5 operations: Redis Lua rate limiting, 429 RFC7807 responses, correlation ID validation, security headers, Actuator exposure, liveness/readiness policy, application metric counters, sensitive metric tag prevention, and documented Redis/PostgreSQL failure behavior.
 - Hyperscale evolution: configurable 8-character short-code generation, invalid configuration bounds, collision metrics, quota enforcement, V4 blocked moderation state, admin block/unblock authorization, blocked redirect behavior, blocked cache DTO handling, and legacy 7-character short-code resolution.
+- Enterprise evolution Stage 1-3: derived full short URL responses, trailing slash normalization, optional idempotent URL creation, same-key replay, different-fingerprint conflicts, concurrent idempotent create safety, destination editing, and ETag/If-Match lost-update prevention.
+- Enterprise evolution Stage 4: default workspace provisioning on registration, workspace APIs, centralized workspace authorization, `X-Workspace-ID` resolution, tenant-isolated URL management, role matrix behavior, viewer analytics access, platform-admin separation from workspace admin, invalid explicit workspace headers, V6 migration tables/indexes, and workspace-scoped idempotency keys.
+- Enterprise evolution Stage 5: V7 audit migration, URL mutation audit events, idempotency replay without duplicate audit rows, stale ETag failure without audit rows, redacted destination metadata, workspace membership audit events, audit endpoint authorization, platform moderation audit, and audit metadata size rejection.
+- Enterprise evolution Stage 6: V8 API-key migration, human OWNER/ADMIN API-key management, raw-key one-time return, digest-only storage, scoped machine URL and analytics access, workspace isolation, malformed/dual/revoked/expired key rejection, API-key/human idempotency separation, API-key audit actor attribution, and public redirect behavior when malformed API-key headers are present.
+- Enterprise evolution Stage 7: V9 outbox migration, same-transaction URL/audit/outbox behavior, rollback of failed outbox publishing, PostgreSQL `SKIP LOCKED` claim isolation, stale claim recovery, retry/dead-letter behavior, cache invalidation handler success, admin outbox authorization and safe DTO behavior, and UTC clock alignment for dispatcher scheduling.
 - Future areas: retention jobs, mutation testing, and formal SAST/SCA tooling.
 
 ## Tooling
@@ -33,7 +38,7 @@
 
 ## Historical phase validation results
 
-The following phase counts are retained as historical milestones. The current final suite contains 84 tests.
+The following phase counts are retained as historical milestones. The current final suite contains 113 tests.
 
 ## Historical Phase 2 validation result
 
@@ -73,7 +78,7 @@ The final green run used PostgreSQL Testcontainers and Redis Testcontainers, app
 
 ## Final validation result
 
-The final validation suite contains 84 tests and passes with:
+The final validation suite contains 113 tests and passes with:
 
 ```powershell
 .\mvnw.cmd clean verify
@@ -81,8 +86,8 @@ The final validation suite contains 84 tests and passes with:
 docker compose config
 ```
 
-The final suite includes tests for Redis-backed limiter isolation and outage behavior, generic 429 Problem Details, correlation ID sanitization and propagation, Actuator exposure, security headers, liveness/readiness policy, application metric counters, bounded Micrometer tags, short-code configuration and collision metrics, quota enforcement, V4 moderation persistence, admin block/unblock authorization, blocked redirects, blocked cache DTO behavior, and legacy 7-character short-code resolution.
+The final suite includes tests for Redis-backed limiter isolation and outage behavior, generic 429 Problem Details, correlation ID sanitization and propagation, Actuator exposure, security headers, liveness/readiness policy, application metric counters, bounded Micrometer tags, short-code configuration and collision metrics, quota enforcement, V4 moderation persistence, admin block/unblock authorization, blocked redirects, blocked cache DTO behavior, legacy 7-character short-code resolution, derived full short URL responses, optional idempotent create, ETag/If-Match destination updates, workspace tenant isolation, workspace RBAC, workspace-scoped idempotency, workspace-bound API-key authentication, and transactional outbox delivery behavior.
 
-The final green run used PostgreSQL Testcontainers and Redis Testcontainers, validated Flyway V1, V2, V3, and V4, applied all four migrations to clean PostgreSQL containers, and completed Hibernate schema validation. `dependency:tree` confirmed Spring Boot-managed `flyway-core:11.7.2`, `flyway-database-postgresql:11.7.2`, Micrometer `1.15.0`, Spring Boot Actuator `3.5.0`, `spring-boot-starter-data-redis:3.5.0`, Lettuce `6.5.5.RELEASE`, Testcontainers `1.21.0`, and no added rate-limiting library. `docker compose config` passed without warnings after removing the obsolete Compose `version` attribute.
+The final green run used PostgreSQL Testcontainers and Redis Testcontainers, validated Flyway V1 through V9, applied all nine migrations to clean PostgreSQL containers, and completed Hibernate schema validation. JaCoCo results are recorded in [coverage-summary.md](coverage-summary.md). `dependency:tree` confirmed Spring Boot-managed `flyway-core:11.7.2`, `flyway-database-postgresql:11.7.2`, Micrometer `1.15.0`, Spring Boot Actuator `3.5.0`, `spring-boot-starter-data-redis:3.5.0`, Lettuce `6.5.5.RELEASE`, Testcontainers `1.21.0`, and no added outbox or rate-limiting library. `docker compose config` passed without warnings after removing the obsolete Compose `version` attribute.
 
 `scripts/verify.sh` was attempted, but the Bash environment failed before Maven startup because `JAVA_HOME` is not defined there. The equivalent required Windows commands above passed.

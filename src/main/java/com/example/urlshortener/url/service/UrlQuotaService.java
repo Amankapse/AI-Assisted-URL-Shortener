@@ -5,12 +5,12 @@ import com.example.urlshortener.common.metrics.AppMetrics;
 import com.example.urlshortener.url.config.UrlQuotaProperties;
 import com.example.urlshortener.url.dto.CreateShortUrlRequest;
 import com.example.urlshortener.url.repository.ShortUrlRepository;
-import com.example.urlshortener.user.entity.UserEntity;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 public class UrlQuotaService {
@@ -29,24 +29,24 @@ public class UrlQuotaService {
         this.metrics = metrics;
     }
 
-    public void enforceCreateQuota(UserEntity owner, CreateShortUrlRequest request) {
+    public void enforceCreateQuota(UUID workspaceId, CreateShortUrlRequest request) {
         if (!properties.isEnabled()) {
             return;
         }
         LocalDateTime today = LocalDate.now(clock).atStartOfDay();
         enforce("daily_creations",
-                repository.countCreatedByOwnerSince(owner, today),
+                repository.countCreatedByWorkspaceIdSince(workspaceId, today),
                 properties.getDailyCreationsPerUser(),
                 "daily_url_creation_quota_exceeded",
                 "Daily URL creation quota exceeded");
         enforce("active_links",
-                repository.countActiveByOwner(owner),
+                repository.countActiveByWorkspaceId(workspaceId),
                 properties.getMaxActiveLinksPerUser(),
                 "active_link_quota_exceeded",
                 "Maximum active link quota exceeded");
         if (request.getCustomAlias() != null && !request.getCustomAlias().isBlank()) {
             enforce("custom_aliases",
-                    repository.countCustomAliasesByOwnerSince(owner, today),
+                    repository.countCustomAliasesByWorkspaceIdSince(workspaceId, today),
                     properties.getDailyCustomAliasesPerUser(),
                     "custom_alias_quota_exceeded",
                     "Daily custom alias quota exceeded");

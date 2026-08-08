@@ -6,6 +6,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -63,6 +64,14 @@ public class AppMetrics {
         increment("url_shortener.rate_limit", "limiter", limiter, "outcome", outcome);
     }
 
+    public void idempotency(String outcome) {
+        increment("url_shortener.idempotency", "outcome", outcome);
+    }
+
+    public void outbox(String operation, String eventType, String handler, String outcome) {
+        increment("url_shortener.outbox." + operation, "eventType", eventType, "handler", handler, "outcome", outcome);
+    }
+
     public Timer.Sample startTimer() {
         return Timer.start(registry);
     }
@@ -70,6 +79,28 @@ public class AppMetrics {
     public void recordAnalyticsBatch(Timer.Sample sample, int size) {
         analyticsBatchSize.record(size);
         sample.stop(analyticsBatchTimer);
+    }
+
+    public void recordOutboxDispatch(Timer.Sample sample, String eventType, String outcome) {
+        sample.stop(Timer.builder("url_shortener.outbox.dispatch_latency")
+                .tags("eventType", eventType, "outcome", outcome)
+                .register(registry));
+    }
+
+    public void recordOutboxHandler(Timer.Sample sample, String handler, String outcome) {
+        sample.stop(Timer.builder("url_shortener.outbox.handler_latency")
+                .tags("handler", handler, "outcome", outcome)
+                .register(registry));
+    }
+
+    public void registerOutboxGauges(AtomicLong backlog, AtomicLong oldestPendingAgeSeconds) {
+        io.micrometer.core.instrument.Gauge.builder("url_shortener.outbox.backlog", backlog, AtomicLong::get)
+                .description("Cached count of pending or processing outbox events")
+                .register(registry);
+        io.micrometer.core.instrument.Gauge.builder("url_shortener.outbox.oldest_pending_age", oldestPendingAgeSeconds, AtomicLong::get)
+                .description("Cached age of oldest pending or processing outbox event")
+                .baseUnit("seconds")
+                .register(registry);
     }
 
     private void increment(String name, String... tags) {

@@ -8,6 +8,7 @@ import jakarta.annotation.PreDestroy;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.stereotype.Service;
@@ -23,8 +24,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
-public class ClickAnalyticsPublisher implements SmartLifecycle {
-    private static final Logger log = LoggerFactory.getLogger(ClickAnalyticsPublisher.class);
+@ConditionalOnProperty(prefix = "app.analytics", name = "publisher", havingValue = "local", matchIfMissing = true)
+public class LocalQueueClickEventPublisher implements ClickEventPublisher, SmartLifecycle {
+    private static final Logger log = LoggerFactory.getLogger(LocalQueueClickEventPublisher.class);
 
     private final BlockingQueue<ClickAnalyticsEvent> queue;
     private final AnalyticsProperties properties;
@@ -36,12 +38,12 @@ public class ClickAnalyticsPublisher implements SmartLifecycle {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private Thread worker;
 
-    public ClickAnalyticsPublisher(AnalyticsProperties properties,
-                                   ClickPrivacySanitizer sanitizer,
-                                   ClickAnalyticsWriter writer,
-                                   AnalyticsCounters counters,
-                                   Clock clock,
-                                   AppMetrics metrics) {
+    public LocalQueueClickEventPublisher(AnalyticsProperties properties,
+                                         ClickPrivacySanitizer sanitizer,
+                                         ClickAnalyticsWriter writer,
+                                         AnalyticsCounters counters,
+                                         Clock clock,
+                                         AppMetrics metrics) {
         this.properties = properties;
         this.sanitizer = sanitizer;
         this.writer = writer;
@@ -51,6 +53,7 @@ public class ClickAnalyticsPublisher implements SmartLifecycle {
         this.queue = new ArrayBlockingQueue<>(properties.getQueueCapacity());
     }
 
+    @Override
     public void publish(RedirectTarget target, HttpServletRequest request) {
         ClickAnalyticsEvent event = new ClickAnalyticsEvent(
                 UUID.randomUUID(),

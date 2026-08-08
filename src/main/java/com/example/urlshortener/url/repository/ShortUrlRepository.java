@@ -20,8 +20,14 @@ public interface ShortUrlRepository extends JpaRepository<ShortUrlEntity, UUID> 
     @Query("select url from ShortUrlEntity url where url.id = :id and url.owner = :owner and url.deleted = false")
     Optional<ShortUrlEntity> findByIdAndOwner(@Param("id") UUID id, @Param("owner") UserEntity owner);
 
+    @Query("select url from ShortUrlEntity url where url.id = :id and url.workspace.id = :workspaceId and url.deleted = false")
+    Optional<ShortUrlEntity> findByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") UUID workspaceId);
+
     @Query("select url from ShortUrlEntity url where url.owner = :owner and url.deleted = false")
     Page<ShortUrlEntity> findByOwner(@Param("owner") UserEntity owner, Pageable pageable);
+
+    @Query("select url from ShortUrlEntity url where url.workspace.id = :workspaceId and url.deleted = false")
+    Page<ShortUrlEntity> findByWorkspaceId(@Param("workspaceId") UUID workspaceId, Pageable pageable);
 
     boolean existsByShortCode(String shortCode);
     boolean existsByCustomAlias(String customAlias);
@@ -30,11 +36,20 @@ public interface ShortUrlRepository extends JpaRepository<ShortUrlEntity, UUID> 
     @Query("select count(url.id) from ShortUrlEntity url where url.owner = :owner and url.createdAt >= :start")
     long countCreatedByOwnerSince(@Param("owner") UserEntity owner, @Param("start") LocalDateTime start);
 
+    @Query("select count(url.id) from ShortUrlEntity url where url.workspace.id = :workspaceId and url.createdAt >= :start")
+    long countCreatedByWorkspaceIdSince(@Param("workspaceId") UUID workspaceId, @Param("start") LocalDateTime start);
+
     @Query("select count(url.id) from ShortUrlEntity url where url.owner = :owner and url.deleted = false and url.enabled = true and url.blocked = false and (url.expiresAt is null or url.expiresAt > CURRENT_TIMESTAMP)")
     long countActiveByOwner(@Param("owner") UserEntity owner);
 
+    @Query("select count(url.id) from ShortUrlEntity url where url.workspace.id = :workspaceId and url.deleted = false and url.enabled = true and url.blocked = false and (url.expiresAt is null or url.expiresAt > CURRENT_TIMESTAMP)")
+    long countActiveByWorkspaceId(@Param("workspaceId") UUID workspaceId);
+
     @Query("select count(url.id) from ShortUrlEntity url where url.owner = :owner and url.customAlias is not null and url.createdAt >= :start")
     long countCustomAliasesByOwnerSince(@Param("owner") UserEntity owner, @Param("start") LocalDateTime start);
+
+    @Query("select count(url.id) from ShortUrlEntity url where url.workspace.id = :workspaceId and url.customAlias is not null and url.createdAt >= :start")
+    long countCustomAliasesByWorkspaceIdSince(@Param("workspaceId") UUID workspaceId, @Param("start") LocalDateTime start);
 
     @Query("select count(url.id) from ShortUrlEntity url where url.enabled = :enabled and url.deleted = false")
     long countByEnabled(@Param("enabled") boolean enabled);

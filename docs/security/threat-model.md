@@ -4,10 +4,13 @@
 | --- | --- | --- | --- |
 | Credential stuffing | Account compromise | BCrypt, generic login failures, Redis login limiter | Distributed low-rate attacks |
 | Brute force registration/login | Abuse and resource use | IP/account rate limits, validation | Proxy/IP reputation not implemented |
-| Resource exhaustion through URL creation | Storage growth and cost | Rate limits plus config-driven URL quotas | Current quota implementation uses aggregate PostgreSQL counts, not distributed counters |
-| IDOR | Cross-user data access | JWT `sub` ownership in services/repositories, no owner IDs in DTOs | Bugs in future admin APIs |
+| Resource exhaustion through URL creation | Storage growth and cost | Rate limits plus config-driven workspace URL quotas | Current quota implementation uses aggregate PostgreSQL counts, not distributed counters |
+| IDOR / tenant escape | Cross-workspace data access | Workspace membership authorization, `workspace_id` repository scope, no owner IDs in DTOs, explicit invalid workspace header failures | Bugs in future privileged APIs |
 | JWT tampering | Unauthorized access | RS256 only, issuer/audience/expiry/claim validation | Key compromise |
 | Refresh-token theft/reuse | Session hijack | HttpOnly Secure SameSite cookie, rotation, reuse family revocation | Client compromise |
+| API-key theft | Machine account takeover inside one workspace | Header-only API keys, least-privilege scopes, expiration, revocation, per-key rate limits, no raw key logging | Stolen bearer key remains valid until expiration or revocation |
+| API-key digest compromise | Offline attack against stored API-key verifier | HMAC-SHA-256 digest with secret `APP_API_KEY_HASH_PEPPER`, high-entropy raw keys, constant-time comparison | Pepper compromise requires coordinated key reissue |
+| Over-scoped machine identity | Automated client performs excessive actions | Explicit `links:read`, `links:write`, and `analytics:read` scopes; no `ROLE_ADMIN`; no workspace/key-management access | Human owners/admins can still issue broad scopes |
 | CSRF | Cookie refresh/logout abuse | CSRF required for refresh/logout, bearer APIs stateless | Misconfigured clients |
 | CORS abuse | Browser credential leakage | Explicit allowlist, no wildcard credentials | Bad allowed-origin config |
 | SSRF via destination URL | Internal network access | URL validation restricts schemes and rejects private/link-local hosts | DNS rebinding not fully solved |
@@ -24,5 +27,7 @@
 | Internet-scale perimeter bypass | Direct origin abuse | Production architecture requires WAF, gateway, trusted proxy controls, CDN/edge | Not implemented in local prototype |
 | Oversized requests | Memory pressure | Tomcat form/swallow limits and DTO limits | Container/proxy limits also required |
 | Enumeration | User/account discovery | Generic login failures and generic rate-limit response | Registration duplicate still reveals registered email |
-| Admin privilege abuse | Data exposure | Explicit admin endpoints, no admin bypass on user APIs | Admin account compromise |
+| Admin privilege abuse | Data exposure | Explicit admin endpoints, no platform-admin bypass on workspace APIs | Admin account compromise |
 | Actuator exposure | Secret/config disclosure | Only health/info/metrics exposed; metrics admin-protected | Misconfigured security profiles |
+| Audit tampering | Loss of accountability | No update/delete audit API, same-transaction audit insert for mutations, append-only table design, no cascading audit FKs | Database superusers can still alter records; cryptographic/WORM immutability is not implemented |
+| Sensitive audit metadata | PII or token leakage | Allowlisted bounded metadata, destination changes store hosts and hashes instead of raw URLs, no passwords/tokens/cookies | Future audit event additions require review |

@@ -125,7 +125,7 @@ class AuthControllerIntegrationTests {
                 .andExpect(jsonPath("$.email").value("jwt@example.com"))
                 .andExpect(jsonPath("$.role").value("USER"));
 
-        mockMvc.perform(get("/api/v1/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token.substring(0, token.length() - 2) + "xx"))
+        mockMvc.perform(get("/api/v1/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token + "x"))
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/api/v1/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + customToken("wrong-issuer", "url-shortener-api", userRepository.findByEmail("jwt@example.com").orElseThrow(), Instant.now().plusSeconds(300), UserRole.USER)))

@@ -1,6 +1,7 @@
 package com.example.urlshortener.url.entity;
 
 import com.example.urlshortener.user.entity.UserEntity;
+import com.example.urlshortener.workspace.entity.WorkspaceEntity;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -29,6 +30,10 @@ public class ShortUrlEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false, foreignKey = @ForeignKey(name = "fk_short_urls_owner"))
     private UserEntity owner;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "workspace_id", nullable = false, foreignKey = @ForeignKey(name = "fk_short_urls_workspace"))
+    private WorkspaceEntity workspace;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -62,6 +67,11 @@ public class ShortUrlEntity {
         this.customAlias = customAlias;
         this.owner = owner;
         this.expiresAt = expiresAt;
+    }
+
+    public ShortUrlEntity(UUID id, String shortCode, String originalUrl, String customAlias, UserEntity owner, WorkspaceEntity workspace, LocalDateTime expiresAt) {
+        this(id, shortCode, originalUrl, customAlias, owner, expiresAt);
+        this.workspace = workspace;
     }
 
     @PrePersist
@@ -107,6 +117,14 @@ public class ShortUrlEntity {
 
     public void setOwner(UserEntity owner) {
         this.owner = owner;
+    }
+
+    public WorkspaceEntity getWorkspace() {
+        return workspace;
+    }
+
+    public void setWorkspace(WorkspaceEntity workspace) {
+        this.workspace = workspace;
     }
 
     public LocalDateTime getCreatedAt() {

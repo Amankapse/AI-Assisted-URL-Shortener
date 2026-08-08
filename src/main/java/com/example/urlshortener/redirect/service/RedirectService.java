@@ -1,6 +1,6 @@
 package com.example.urlshortener.redirect.service;
 
-import com.example.urlshortener.analytics.service.ClickAnalyticsPublisher;
+import com.example.urlshortener.analytics.service.ClickEventPublisher;
 import com.example.urlshortener.common.exception.BadRequestException;
 import com.example.urlshortener.common.exception.ResourceNotFoundException;
 import com.example.urlshortener.common.metrics.AppMetrics;
@@ -21,7 +21,7 @@ public class RedirectService {
     private final UrlService urlService;
     private final RedirectCacheService cacheService;
     private final SingleFlightRedirectLoader singleFlightLoader;
-    private final ClickAnalyticsPublisher analyticsPublisher;
+    private final ClickEventPublisher analyticsPublisher;
     private final Clock clock;
     private final RateLimiterService rateLimiter;
     private final ClientIpResolver clientIpResolver;
@@ -30,7 +30,7 @@ public class RedirectService {
     public RedirectService(UrlService urlService,
                            RedirectCacheService cacheService,
                            SingleFlightRedirectLoader singleFlightLoader,
-                           ClickAnalyticsPublisher analyticsPublisher,
+                           ClickEventPublisher analyticsPublisher,
                            Clock clock,
                            RateLimiterService rateLimiter,
                            ClientIpResolver clientIpResolver,

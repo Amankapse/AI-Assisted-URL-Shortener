@@ -4,7 +4,8 @@
 
 1. Client posts email and password to `POST /api/v1/auth/register`.
 2. `AuthService` normalizes email, validates password bounds, rejects duplicates, hashes the password with BCrypt, and creates an active `USER`.
-3. API returns a safe user DTO.
+3. Registration creates a default workspace and assigns the new user `OWNER` membership in the same transaction.
+4. API returns a safe user DTO.
 
 ## Login
 
@@ -21,9 +22,11 @@
 3. If a revoked token is reused, the family is marked compromised, active family tokens are revoked, the response clears the cookie, and the client must log in again.
 4. Successful refresh returns a new access token and replacement refresh cookie.
 
-## Ownership
+## Workspace Authorization
 
 1. Protected URL endpoints require `Authorization: Bearer <token>`.
 2. Spring Security validates RS256 signature, issuer, audience, expiration, and required claims.
 3. The JWT principal is converted into `OwnerIdentity` through `SecurityCurrentOwnerProvider`.
-4. URL services use the JWT `sub` UUID for repository ownership scope.
+4. Workspace resolution uses `X-Workspace-ID` when present or the actor's default workspace when absent.
+5. Explicit malformed, unknown, or unauthorized workspace headers fail without default fallback.
+6. URL services require the appropriate workspace role and scope repository queries by `workspace_id`.

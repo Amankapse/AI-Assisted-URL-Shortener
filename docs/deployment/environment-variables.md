@@ -26,6 +26,7 @@ Use placeholders only in documentation and committed files. Configure real value
 | `APP_AUTH_SECURE_COOKIES` | Yes | No | Secure refresh-cookie flag for HTTPS production | `true` |
 | `APP_AUTH_ALLOWED_ORIGINS` | Yes | No | Explicit CORS allowlist | `https://<FRONTEND_DOMAIN>` |
 | `APP_ANALYTICS_IP_HASH_PEPPER` | Yes | Yes | HMAC pepper for IP anonymization | `<STRONG_RANDOM_SECRET>` |
+| `APP_ANALYTICS_PUBLISHER` | No | No | Analytics publisher mode: `local` or `outbox`; defaults to `local` | `local` |
 | `APP_ANALYTICS_QUEUE_CAPACITY` | No | No | Analytics queue capacity | `1000` |
 | `APP_ANALYTICS_BATCH_SIZE` | No | No | Analytics batch size | `100` |
 | `APP_ANALYTICS_FLUSH_INTERVAL` | No | No | Analytics flush interval | `1s` |
@@ -60,7 +61,29 @@ Use placeholders only in documentation and committed files. Configure real value
 | `SHORTENER_QUOTA_DAILY_CREATIONS_PER_USER` | No | No | Daily URL creations per user | `10000` |
 | `SHORTENER_QUOTA_MAX_ACTIVE_LINKS_PER_USER` | No | No | Max active links per user | `100000` |
 | `SHORTENER_QUOTA_DAILY_CUSTOM_ALIASES_PER_USER` | No | No | Daily custom aliases per user | `1000` |
+| `APP_AUDIT_METADATA_MAX_BYTES` | No | No | Maximum serialized safe audit metadata size | `4096` |
+| `APP_AUDIT_RETENTION` | No | No | Documented audit retention horizon; no destructive purge job is implemented | `3650d` |
+| `APP_API_KEY_HASH_PEPPER` | Yes | Yes | HMAC pepper for one-way API-key digests | `<STRONG_RANDOM_SECRET>` |
+| `APP_API_KEY_DEFAULT_EXPIRY` | No | No | Default machine API-key expiry when omitted | `90d` |
+| `APP_API_KEY_MAX_EXPIRY` | No | No | Maximum allowed machine API-key lifetime | `365d` |
+| `APP_API_KEY_LAST_USED_UPDATE_INTERVAL` | No | No | Minimum interval between last-used database updates | `15m` |
+| `APP_API_KEY_MAX_HEADER_LENGTH` | No | No | Maximum accepted `X-API-Key` header length | `256` |
+| `APP_RATE_LIMIT_API_KEY_REQUESTS` | No | No | Per-key machine API request limit | `600` |
+| `APP_RATE_LIMIT_API_KEY_WINDOW` | No | No | Per-key machine API request window | `1m` |
+| `APP_OUTBOX_ENABLED` | No | No | Enable transactional outbox dispatcher | `true` |
+| `APP_OUTBOX_BATCH_SIZE` | No | No | Dispatcher claim batch size | `25` |
+| `APP_OUTBOX_POLL_INTERVAL` | No | No | Dispatcher poll interval | `1s` |
+| `APP_OUTBOX_WORKERS` | No | No | Dispatcher worker count | `1` |
+| `APP_OUTBOX_MAX_ATTEMPTS` | No | No | Retry attempts before dead-lettering | `5` |
+| `APP_OUTBOX_BASE_BACKOFF` | No | No | Initial retry backoff | `1s` |
+| `APP_OUTBOX_MAX_BACKOFF` | No | No | Maximum retry backoff | `1m` |
+| `APP_OUTBOX_CLAIM_TIMEOUT` | No | No | Stale claim recovery timeout | `5m` |
+| `APP_OUTBOX_RETENTION` | No | No | Processed outbox retention before bounded cleanup | `7d` |
+| `APP_OUTBOX_CLEANUP_INTERVAL` | No | No | Processed-row cleanup interval | `1h` |
+| `APP_OUTBOX_CLEANUP_BATCH_SIZE` | No | No | Processed-row cleanup batch size | `500` |
+| `APP_OUTBOX_MAX_PAYLOAD_BYTES` | No | No | Maximum serialized outbox payload size | `8192` |
+| `APP_OUTBOX_SHUTDOWN_GRACE_PERIOD` | No | No | Dispatcher shutdown wait period | `10s` |
+| `APP_OUTBOX_METRICS_REFRESH_INTERVAL` | No | No | Outbox gauge refresh interval | `30s` |
 | `SERVER_MAX_HTTP_FORM_POST_SIZE` | No | No | Tomcat form body limit | `2MB` |
 | `SERVER_MAX_SWALLOW_SIZE` | No | No | Tomcat swallow size limit | `2MB` |
 | `JAVA_TOOL_OPTIONS` | No | No | JVM heap/GC options for small container | `-Xms64m -Xmx320m -XX:+UseG1GC` |
-

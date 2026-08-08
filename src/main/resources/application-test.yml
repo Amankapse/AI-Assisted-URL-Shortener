@@ -18,7 +18,10 @@ app:
   auth:
     secure-cookies: false
   analytics:
+    publisher: local
     ip-hash-pepper: test-analytics-pepper
+  outbox:
+    enabled: false
   redirect:
     cache:
       enabled: false
@@ -47,6 +50,10 @@ app:
         window: 1m
         fail-open: true
       admin-analytics:
+        limit: 1000
+        window: 1m
+        fail-open: true
+      api-key:
         limit: 1000
         window: 1m
         fail-open: true

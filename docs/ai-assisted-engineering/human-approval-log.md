@@ -69,3 +69,51 @@ This log records explicit approvals for decisions that affect architecture, secu
 - Approved implementation path: production profile configuration, Render `PORT` support, environment-driven Neon/Redis/JWT/CORS/privacy settings, Docker runtime JAR startup, `.env.example` deployment template, `.gitignore`/`.dockerignore` secret hygiene, README link, and deployment documentation.
 - Render deploy blocker correction: deployment logs showed `no main manifest attribute` because the Maven package artifact was not repackaged as an executable Spring Boot JAR. Approved correction was binding `spring-boot:repackage` in the existing Spring Boot Maven plugin. No dependency, migration, auth, or business logic change was made.
 - Validation: `.\mvnw.cmd clean verify` passed with 84 tests and JaCoCo line 84.44% / branch 65.41%; PostgreSQL and Redis Testcontainers started; Flyway V1-V4 validated and applied; Hibernate schema validation succeeded; `.\mvnw.cmd dependency:tree` passed with no new production dependency; `docker compose config` passed; Markdown link check passed for 54 files; `docker compose up -d` plus bounded local `spring-boot:run` liveness smoke passed; Docker image build `url-shortener-render-smoke` passed.
+
+## Enterprise Production Evolution Stages 1-3
+
+- Approved implementation start for Stages 1-3 only: public URL representation, idempotent URL creation, and destination editing with optimistic concurrency.
+- Approved migration: `V5__idempotency_keys.sql`. V1-V4 must not be modified.
+- Approved public API changes: additive `shortUrl` response field, optional `Idempotency-Key` for URL creation, `ETag` on URL management responses, and `PATCH /api/v1/urls/{id}/destination` requiring `If-Match`.
+- Explicitly deferred until after review: workspace migration, immutable audit trail, API keys, outbox, analytics publisher abstraction, cache invalidation durability, mapping-store abstraction, redirect coordination abstraction, tags/campaigns/search, QR codes, tracing, and Angular frontend.
+- Validation: `.\mvnw.cmd clean verify` passed with 89 tests and JaCoCo line 85.83% / branch 65.58%; PostgreSQL and Redis Testcontainers started; Flyway V1-V5 validated and applied; Hibernate schema validation succeeded; `.\mvnw.cmd dependency:tree` passed with no new production dependency; `docker compose config` passed without warnings.
+
+## Stage 4 Workspace/Tenant Foundation and Workspace RBAC
+
+- Approved implementation scope: workspace tenant foundation and workspace RBAC only.
+- Approved migration: `V6__workspaces_and_memberships.sql`; V1-V5 were not modified.
+- Approved API surface: workspace endpoints under `/api/v1/workspaces` and optional `X-Workspace-ID` header for existing URL/analytics management APIs.
+- Approved role model: workspace `OWNER`, `ADMIN`, `EDITOR`, `ANALYST`, and `VIEWER`; platform `ROLE_ADMIN` remains separate and is not workspace admin.
+- Explicitly deferred: audit table/hooks implementation, API keys, outbox, analytics publisher abstraction, tags/campaigns/search, QR codes, tracing, Angular frontend, and Stage 5 work.
+- Validation: `.\mvnw.cmd -q -Dtest=WorkspaceControllerIntegrationTests test` passed; `.\mvnw.cmd clean verify` passed with 92 tests and JaCoCo line 84.48% / branch 63.42%; PostgreSQL and Redis Testcontainers started; Flyway V1-V6 validated and applied; Hibernate schema validation succeeded; `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed.
+
+## Stage 5 Immutable Enterprise Audit Trail
+
+- Approved implementation scope: immutable enterprise audit trail only.
+- Approved migration: `V7__audit_events.sql`; V1-V6 were not modified.
+- Approved API surface: read-only audit endpoints for workspace audit, URL audit, and explicit platform admin audit.
+- Approved immutability boundary: application-level append-only behavior with no update/delete audit APIs; no cryptographic chaining or WORM storage claim.
+- Approved metadata policy: allowlisted bounded JSONB metadata, `APP_AUDIT_METADATA_MAX_BYTES`, no sensitive values, no raw destination URLs, and same-transaction audit insert where practical.
+- Explicitly deferred: API keys, transactional outbox, tags/campaigns/search, QR codes, tracing, Angular frontend, and distributed infrastructure.
+- Validation: `.\mvnw.cmd clean verify` passed with 97 tests and JaCoCo line 85.62% / branch 62.80%; PostgreSQL and Redis Testcontainers started; Flyway V1-V7 validated and applied; Hibernate schema validation succeeded; `.\mvnw.cmd dependency:tree` passed with no new production dependency; `docker compose config` passed without warnings.
+
+## Stage 6 API Keys / Machine-To-Machine Authentication
+
+- Approved implementation scope: API keys / machine-to-machine authentication only.
+- Approved migration: `V8__api_keys.sql`; V1-V7 were not modified.
+- Approved public API surface: workspace API-key create, list, and revoke endpoints under `/api/v1/workspaces/{workspaceId}/api-keys`.
+- Approved credential model: header-only `X-API-Key`, one-time raw key return, HMAC-SHA-256 digest storage using `APP_API_KEY_HASH_PEPPER`, expiration, revocation, and workspace-bound scopes.
+- Approved scope model: `links:read`, `links:write`, and `analytics:read`; no platform admin authority and no workspace/key management by API keys.
+- Explicitly deferred: transactional outbox, tracing, QR codes, frontend, distributed API gateway, external secret manager implementation, and Stage 7 work.
+- Validation: focused `.\mvnw.cmd -q -Dtest=ApiKeyIntegrationTests test` passed; `.\mvnw.cmd clean verify` passed with 105 tests and JaCoCo line 87.09% / branch 63.87%; PostgreSQL and Redis Testcontainers started; Flyway V1-V8 validated and applied; Hibernate schema validation succeeded; `.\mvnw.cmd dependency:tree` passed with no new production dependency; `docker compose config` passed without warnings.
+
+## Stage 7 Transactional Outbox And Durable Event Delivery
+
+- Approved implementation scope: transactional outbox and durable event delivery only.
+- Approved migration: `V9__outbox_events.sql`; V1-V8 were not modified.
+- Approved no new production dependencies.
+- Approved architecture: PostgreSQL transactional outbox, `DomainEventPublisher`, bounded dispatcher using `FOR UPDATE SKIP LOCKED`, at-least-once delivery, retry/dead-letter behavior, durable cache invalidation handler, optional outbox analytics publisher, and read-only platform-admin outbox inspection.
+- Approved analytics default: `APP_ANALYTICS_PUBLISHER=local` in all profiles; `outbox` is opt-in and documented as not the hyperscale click-stream target.
+- Explicitly deferred: tracing, QR codes, frontend, external broker infrastructure, distributed API gateway, and Stage 8 work.
+- Focused validation: `.\mvnw.cmd -q "-Dtest=OutboxIntegrationTests,OutboxRollbackIntegrationTests" test` passed; PostgreSQL Testcontainers started; Flyway V1-V9 validated and applied; Hibernate schema validation succeeded.
+- Full validation: `.\mvnw.cmd clean verify` passed with 113 tests and JaCoCo line 85.15% / branch 60.53%; PostgreSQL and Redis Testcontainers started; Flyway V1-V9 validated and applied; Hibernate schema validation succeeded; `.\mvnw.cmd dependency:tree` passed with no new production dependency; `docker compose config` passed without warnings.

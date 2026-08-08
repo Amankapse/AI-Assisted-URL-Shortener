@@ -27,6 +27,7 @@ This directory contains the detailed evidence for the AI-Assisted URL Shortener 
 - [Authentication sequence](architecture/sequence-authentication.md)
 - [Observability](architecture/observability.md)
 - [Rate limiting](architecture/rate-limiting.md)
+- [Transactional outbox](architecture/transactional-outbox.md)
 - [ADRs](architecture/adr)
 
 ## API
