@@ -1,0 +1,16 @@
+<section class="notifications" aria-live="polite" aria-label="Notifications">
+  @for (message of notifications.messages(); track message.id) {
+    <article class="notification" [class.error]="message.tone === 'error'">
+      <div>
+        <strong>{{ message.title }}</strong>
+        @if (message.detail) {
+          <p>{{ message.detail }}</p>
+        }
+        @if (message.correlationId) {
+          <small>Correlation ID: {{ message.correlationId }}</small>
+        }
+      </div>
+      <button type="button" aria-label="Dismiss notification" (click)="notifications.dismiss(message.id)">x</button>
+    </article>
+  }
+</section>

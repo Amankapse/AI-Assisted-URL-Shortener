@@ -6,6 +6,7 @@ import java.time.Duration;
 
 @ConfigurationProperties(prefix = "app.analytics")
 public class AnalyticsProperties {
+    private String publisher = "local";
     private String ipHashPepper = "";
     private int queueCapacity = 1000;
     private int batchSize = 100;
@@ -14,6 +15,14 @@ public class AnalyticsProperties {
     private Duration shutdownFlushTimeout = Duration.ofSeconds(5);
     private int retryCount = 2;
     private int topLinksMax = 25;
+
+    public String getPublisher() {
+        return publisher;
+    }
+
+    public void setPublisher(String publisher) {
+        this.publisher = publisher;
+    }
 
     public String getIpHashPepper() {
         return ipHashPepper;

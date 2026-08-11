@@ -97,12 +97,19 @@ public class RedirectCacheService {
             return;
         }
         try {
-            redisTemplate.delete(key(shortCode));
+            evictRequired(shortCode);
             metrics.cache("invalidation", "success");
         } catch (RedisConnectionFailureException | RedisSystemException | QueryTimeoutException ex) {
             log.warn("Redis eviction failed for redirect cache key {}", key(shortCode));
             metrics.cache("invalidation", "failure");
         }
+    }
+
+    public void evictRequired(String shortCode) {
+        if (!properties.isEnabled() || shortCode == null || shortCode.isBlank()) {
+            return;
+        }
+        redisTemplate.delete(key(shortCode));
     }
 
     public String key(String shortCode) {

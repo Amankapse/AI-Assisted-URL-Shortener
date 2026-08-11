@@ -1,0 +1,5 @@
+{
+  "apiBaseUrl": "http://localhost:8080",
+  "publicShortUrlBase": "http://localhost:8080",
+  "environment": "local"
+}

@@ -5,6 +5,7 @@ import com.example.urlshortener.analytics.dto.AnalyticsDtos.DailyRedirectsRespon
 import com.example.urlshortener.analytics.dto.AnalyticsDtos.TopLinkResponse;
 import com.example.urlshortener.analytics.dto.AnalyticsDtos.UrlAnalyticsResponse;
 import com.example.urlshortener.analytics.service.AnalyticsQueryService;
+import com.example.urlshortener.workspace.service.WorkspaceContextResolver;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -21,13 +22,17 @@ public class AnalyticsController {
     }
 
     @GetMapping("/api/v1/urls/{id}/analytics")
-    public ResponseEntity<UrlAnalyticsResponse> urlAnalytics(@PathVariable("id") UUID id) {
-        return ResponseEntity.ok(analyticsQueryService.urlAnalytics(id));
+    public ResponseEntity<UrlAnalyticsResponse> urlAnalytics(
+            @PathVariable("id") UUID id,
+            @RequestHeader(name = WorkspaceContextResolver.WORKSPACE_HEADER, required = false) String workspaceHeader) {
+        return ResponseEntity.ok(analyticsQueryService.urlAnalytics(id, workspaceHeader));
     }
 
     @GetMapping("/api/v1/urls/{id}/analytics/daily")
-    public ResponseEntity<DailyRedirectsResponse> dailyAnalytics(@PathVariable("id") UUID id) {
-        return ResponseEntity.ok(analyticsQueryService.dailyAnalytics(id));
+    public ResponseEntity<DailyRedirectsResponse> dailyAnalytics(
+            @PathVariable("id") UUID id,
+            @RequestHeader(name = WorkspaceContextResolver.WORKSPACE_HEADER, required = false) String workspaceHeader) {
+        return ResponseEntity.ok(analyticsQueryService.dailyAnalytics(id, workspaceHeader));
     }
 
     @PreAuthorize("hasRole('ADMIN')")

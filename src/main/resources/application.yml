@@ -52,6 +52,7 @@ server:
     max-http-form-post-size: ${SERVER_MAX_HTTP_FORM_POST_SIZE:2MB}
     max-swallow-size: ${SERVER_MAX_SWALLOW_SIZE:2MB}
 app:
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
   auth:
     issuer: ${APP_AUTH_ISSUER:url-shortener}
     audience: ${APP_AUTH_AUDIENCE:url-shortener-api}
@@ -71,6 +72,7 @@ app:
       single-flight-timeout: ${APP_REDIRECT_CACHE_SINGLE_FLIGHT_TIMEOUT:2s}
       single-flight-capacity: ${APP_REDIRECT_CACHE_SINGLE_FLIGHT_CAPACITY:1024}
   analytics:
+    publisher: ${APP_ANALYTICS_PUBLISHER:local}
     ip-hash-pepper: ${APP_ANALYTICS_IP_HASH_PEPPER:}
     queue-capacity: ${APP_ANALYTICS_QUEUE_CAPACITY:1000}
     batch-size: ${APP_ANALYTICS_BATCH_SIZE:100}
@@ -79,6 +81,41 @@ app:
     shutdown-flush-timeout: ${APP_ANALYTICS_SHUTDOWN_FLUSH_TIMEOUT:5s}
     retry-count: ${APP_ANALYTICS_RETRY_COUNT:2}
     top-links-max: ${APP_ANALYTICS_TOP_LINKS_MAX:25}
+  idempotency:
+    retention: ${APP_IDEMPOTENCY_RETENTION:24h}
+    cleanup-interval: ${APP_IDEMPOTENCY_CLEANUP_INTERVAL:1h}
+  audit:
+    metadata-max-bytes: ${APP_AUDIT_METADATA_MAX_BYTES:4096}
+    retention: ${APP_AUDIT_RETENTION:3650d}
+  api-key:
+    hash-pepper: ${APP_API_KEY_HASH_PEPPER:local-development-api-key-pepper}
+    default-expiry: ${APP_API_KEY_DEFAULT_EXPIRY:90d}
+    max-expiry: ${APP_API_KEY_MAX_EXPIRY:365d}
+    last-used-update-interval: ${APP_API_KEY_LAST_USED_UPDATE_INTERVAL:15m}
+    max-header-length: ${APP_API_KEY_MAX_HEADER_LENGTH:256}
+  outbox:
+    enabled: ${APP_OUTBOX_ENABLED:true}
+    batch-size: ${APP_OUTBOX_BATCH_SIZE:25}
+    poll-interval: ${APP_OUTBOX_POLL_INTERVAL:1s}
+    workers: ${APP_OUTBOX_WORKERS:1}
+    max-attempts: ${APP_OUTBOX_MAX_ATTEMPTS:5}
+    base-backoff: ${APP_OUTBOX_BASE_BACKOFF:1s}
+    max-backoff: ${APP_OUTBOX_MAX_BACKOFF:1m}
+    claim-timeout: ${APP_OUTBOX_CLAIM_TIMEOUT:5m}
+    retention: ${APP_OUTBOX_RETENTION:7d}
+    cleanup-interval: ${APP_OUTBOX_CLEANUP_INTERVAL:1h}
+    cleanup-batch-size: ${APP_OUTBOX_CLEANUP_BATCH_SIZE:500}
+    max-payload-bytes: ${APP_OUTBOX_MAX_PAYLOAD_BYTES:8192}
+    shutdown-grace-period: ${APP_OUTBOX_SHUTDOWN_GRACE_PERIOD:10s}
+    metrics-refresh-interval: ${APP_OUTBOX_METRICS_REFRESH_INTERVAL:30s}
+  url-organization:
+    tag-max-length: ${APP_TAG_MAX_LENGTH:50}
+    tags-per-url: ${APP_TAGS_PER_URL:10}
+    campaign-name-max-length: ${APP_CAMPAIGN_NAME_MAX_LENGTH:120}
+    campaign-description-max-length: ${APP_CAMPAIGN_DESCRIPTION_MAX_LENGTH:500}
+    search-query-max-length: ${APP_SEARCH_QUERY_MAX_LENGTH:100}
+    default-page-size: ${APP_URL_SEARCH_DEFAULT_PAGE_SIZE:20}
+    max-page-size: ${APP_URL_SEARCH_MAX_PAGE_SIZE:100}
   rate-limit:
     enabled: ${APP_RATE_LIMIT_ENABLED:true}
     key-salt: ${APP_RATE_LIMIT_KEY_SALT:local-development-rate-limit-salt}
@@ -108,6 +145,10 @@ app:
         limit: ${APP_RATE_LIMIT_ADMIN_ANALYTICS_LIMIT:120}
         window: ${APP_RATE_LIMIT_ADMIN_ANALYTICS_WINDOW:1m}
         fail-open: true
+      api-key:
+        limit: ${APP_RATE_LIMIT_API_KEY_REQUESTS:600}
+        window: ${APP_RATE_LIMIT_API_KEY_WINDOW:1m}
+        fail-open: false
 shortener:
   code:
     length: ${SHORTENER_CODE_LENGTH:8}

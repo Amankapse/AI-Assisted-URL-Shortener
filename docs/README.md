@@ -6,10 +6,13 @@ This directory contains the detailed evidence for the AI-Assisted URL Shortener 
 
 - [Deployment overview](deployment/README.md)
 - [Render deployment](deployment/render.md)
+- [Render Static Site frontend](deployment/frontend-render.md)
 - [Neon PostgreSQL](deployment/neon.md)
 - [Environment variables](deployment/environment-variables.md)
 - [Production validation](deployment/production-validation.md)
+- [Production smoke test](deployment/production-smoke.md)
 - [Free-tier limitations](deployment/free-tier-limitations.md)
+- [Release checklist](release-checklist.md)
 
 ## Architecture
 
@@ -27,11 +30,22 @@ This directory contains the detailed evidence for the AI-Assisted URL Shortener 
 - [Authentication sequence](architecture/sequence-authentication.md)
 - [Observability](architecture/observability.md)
 - [Rate limiting](architecture/rate-limiting.md)
+- [Transactional outbox](architecture/transactional-outbox.md)
 - [ADRs](architecture/adr)
 
 ## API
 
 - [API notes](api.md)
+
+## Frontend
+
+- [Frontend architecture](frontend/architecture.md)
+- [Frontend authentication](frontend/authentication.md)
+- [Runtime configuration](frontend/runtime-configuration.md)
+- [Frontend deployment](frontend/deployment.md)
+- [Frontend security](frontend/security.md)
+- [Frontend testing](frontend/testing.md)
+- [User flows](frontend/user-flows.md)
 
 ## Security
 

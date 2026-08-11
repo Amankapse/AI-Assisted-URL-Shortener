@@ -8,6 +8,9 @@ import com.example.urlshortener.user.entity.UserEntity;
 import com.example.urlshortener.user.entity.UserRole;
 import com.example.urlshortener.user.entity.UserStatus;
 import com.example.urlshortener.user.repository.UserRepository;
+import com.example.urlshortener.workspace.entity.WorkspaceEntity;
+import com.example.urlshortener.workspace.repository.WorkspaceMembershipRepository;
+import com.example.urlshortener.workspace.repository.WorkspaceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +22,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static com.example.urlshortener.testsupport.WorkspaceTestSupport.defaultWorkspace;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -28,6 +32,8 @@ class ClickAnalyticsWriterIntegrationTests {
     @Autowired ShortUrlRepository shortUrlRepository;
     @Autowired ClickEventRepository clickEventRepository;
     @Autowired RefreshTokenRepository refreshTokenRepository;
+    @Autowired WorkspaceRepository workspaceRepository;
+    @Autowired WorkspaceMembershipRepository workspaceMembershipRepository;
 
     @BeforeEach
     void cleanDatabase() {
@@ -40,7 +46,8 @@ class ClickAnalyticsWriterIntegrationTests {
     @Test
     void batchPersistenceShouldBeIdempotentAndUseAtomicCounterUpdates() {
         UserEntity owner = userRepository.saveAndFlush(new UserEntity(UUID.randomUUID(), "owner@example.com", "hash", UserRole.USER, UserStatus.ACTIVE));
-        ShortUrlEntity url = shortUrlRepository.saveAndFlush(new ShortUrlEntity(UUID.randomUUID(), "abc1234", "https://example.com", null, owner, LocalDateTime.now().plusDays(1)));
+        WorkspaceEntity workspace = defaultWorkspace(owner, workspaceRepository, workspaceMembershipRepository);
+        ShortUrlEntity url = shortUrlRepository.saveAndFlush(new ShortUrlEntity(UUID.randomUUID(), "abc1234", "https://example.com", null, owner, workspace, LocalDateTime.now().plusDays(1)));
         UUID eventId = UUID.randomUUID();
         ClickAnalyticsEvent event = new ClickAnalyticsEvent(eventId, url.getId(), LocalDateTime.now(), "hash", "desktop", "example.org", "corr-1");
 

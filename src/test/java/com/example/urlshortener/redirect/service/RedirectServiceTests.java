@@ -1,6 +1,6 @@
 package com.example.urlshortener.redirect.service;
 
-import com.example.urlshortener.analytics.service.ClickAnalyticsPublisher;
+import com.example.urlshortener.analytics.service.ClickEventPublisher;
 import com.example.urlshortener.common.exception.BadRequestException;
 import com.example.urlshortener.common.exception.ResourceNotFoundException;
 import com.example.urlshortener.common.metrics.AppMetrics;
@@ -33,7 +33,7 @@ class RedirectServiceTests {
     private UrlService urlService;
     private RedirectCacheService cacheService;
     private SingleFlightRedirectLoader singleFlightLoader;
-    private ClickAnalyticsPublisher analyticsPublisher;
+    private ClickEventPublisher analyticsPublisher;
     private HttpServletRequest request;
     private RedirectService redirectService;
 
@@ -42,7 +42,7 @@ class RedirectServiceTests {
         urlService = Mockito.mock(UrlService.class);
         cacheService = Mockito.mock(RedirectCacheService.class);
         singleFlightLoader = Mockito.mock(SingleFlightRedirectLoader.class);
-        analyticsPublisher = Mockito.mock(ClickAnalyticsPublisher.class);
+        analyticsPublisher = Mockito.mock(ClickEventPublisher.class);
         request = Mockito.mock(HttpServletRequest.class);
         RateLimiterService rateLimiter = Mockito.mock(RateLimiterService.class);
         ClientIpResolver clientIpResolver = Mockito.mock(ClientIpResolver.class);

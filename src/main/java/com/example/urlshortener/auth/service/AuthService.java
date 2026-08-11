@@ -9,6 +9,7 @@ import com.example.urlshortener.user.entity.UserEntity;
 import com.example.urlshortener.user.entity.UserRole;
 import com.example.urlshortener.user.entity.UserStatus;
 import com.example.urlshortener.user.repository.UserRepository;
+import com.example.urlshortener.workspace.service.WorkspaceService;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,15 +24,18 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService jwtTokenService;
     private final RefreshTokenService refreshTokenService;
+    private final WorkspaceService workspaceService;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        JwtTokenService jwtTokenService,
-                       RefreshTokenService refreshTokenService) {
+                       RefreshTokenService refreshTokenService,
+                       WorkspaceService workspaceService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenService = jwtTokenService;
         this.refreshTokenService = refreshTokenService;
+        this.workspaceService = workspaceService;
     }
 
     @Transactional
@@ -43,6 +47,7 @@ public class AuthService {
         }
         UserEntity user = new UserEntity(UUID.randomUUID(), email, passwordEncoder.encode(request.password()), UserRole.USER, UserStatus.ACTIVE);
         UserEntity saved = userRepository.save(user);
+        workspaceService.createDefaultWorkspace(saved);
         return toUserResponse(saved);
     }
 

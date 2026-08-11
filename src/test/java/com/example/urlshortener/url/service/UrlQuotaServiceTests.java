@@ -5,9 +5,6 @@ import com.example.urlshortener.common.metrics.AppMetrics;
 import com.example.urlshortener.url.config.UrlQuotaProperties;
 import com.example.urlshortener.url.dto.CreateShortUrlRequest;
 import com.example.urlshortener.url.repository.ShortUrlRepository;
-import com.example.urlshortener.user.entity.UserEntity;
-import com.example.urlshortener.user.entity.UserRole;
-import com.example.urlshortener.user.entity.UserStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -28,7 +25,7 @@ class UrlQuotaServiceTests {
     private ShortUrlRepository repository;
     private AppMetrics metrics;
     private UrlQuotaService quotaService;
-    private UserEntity owner;
+    private UUID workspaceId;
     private CreateShortUrlRequest request;
 
     @BeforeEach
@@ -42,7 +39,7 @@ class UrlQuotaServiceTests {
                 Clock.fixed(Instant.parse("2026-08-07T10:00:00Z"), ZoneOffset.UTC),
                 metrics
         );
-        owner = new UserEntity(UUID.randomUUID(), "owner@example.com", "hash", UserRole.USER, UserStatus.ACTIVE);
+        workspaceId = UUID.randomUUID();
         request = new CreateShortUrlRequest();
         request.setOriginalUrl("https://example.com");
     }
@@ -51,10 +48,10 @@ class UrlQuotaServiceTests {
     void shouldAllowRequestBelowConfiguredQuotas() {
         properties.setDailyCreationsPerUser(2);
         properties.setMaxActiveLinksPerUser(2);
-        when(repository.countCreatedByOwnerSince(any(), any())).thenReturn(1L);
-        when(repository.countActiveByOwner(owner)).thenReturn(1L);
+        when(repository.countCreatedByWorkspaceIdSince(any(), any())).thenReturn(1L);
+        when(repository.countActiveByWorkspaceId(workspaceId)).thenReturn(1L);
 
-        quotaService.enforceCreateQuota(owner, request);
+        quotaService.enforceCreateQuota(workspaceId, request);
 
         verify(metrics).quota("daily_creations", "accepted");
         verify(metrics).quota("active_links", "accepted");
@@ -63,9 +60,9 @@ class UrlQuotaServiceTests {
     @Test
     void shouldRejectDailyCreationQuotaExhaustion() {
         properties.setDailyCreationsPerUser(1);
-        when(repository.countCreatedByOwnerSince(any(), any())).thenReturn(1L);
+        when(repository.countCreatedByWorkspaceIdSince(any(), any())).thenReturn(1L);
 
-        assertThatThrownBy(() -> quotaService.enforceCreateQuota(owner, request))
+        assertThatThrownBy(() -> quotaService.enforceCreateQuota(workspaceId, request))
                 .isInstanceOf(QuotaExceededException.class)
                 .hasMessageContaining("Daily URL creation quota exceeded");
         verify(metrics).quota("daily_creations", "rejected");
@@ -75,11 +72,11 @@ class UrlQuotaServiceTests {
     void shouldRejectCustomAliasQuotaOnlyForAliasRequests() {
         properties.setDailyCustomAliasesPerUser(1);
         request.setCustomAlias("campaign");
-        when(repository.countCreatedByOwnerSince(any(), any())).thenReturn(0L);
-        when(repository.countActiveByOwner(owner)).thenReturn(0L);
-        when(repository.countCustomAliasesByOwnerSince(any(), any())).thenReturn(1L);
+        when(repository.countCreatedByWorkspaceIdSince(any(), any())).thenReturn(0L);
+        when(repository.countActiveByWorkspaceId(workspaceId)).thenReturn(0L);
+        when(repository.countCustomAliasesByWorkspaceIdSince(any(), any())).thenReturn(1L);
 
-        assertThatThrownBy(() -> quotaService.enforceCreateQuota(owner, request))
+        assertThatThrownBy(() -> quotaService.enforceCreateQuota(workspaceId, request))
                 .isInstanceOf(QuotaExceededException.class)
                 .hasMessageContaining("Daily custom alias quota exceeded");
     }
@@ -88,9 +85,9 @@ class UrlQuotaServiceTests {
     void disabledQuotaShouldNotQueryRepository() {
         properties.setEnabled(false);
 
-        quotaService.enforceCreateQuota(owner, request);
+        quotaService.enforceCreateQuota(workspaceId, request);
 
-        verify(repository, never()).countCreatedByOwnerSince(any(), any());
-        verify(repository, never()).countActiveByOwner(any());
+        verify(repository, never()).countCreatedByWorkspaceIdSince(any(), any());
+        verify(repository, never()).countActiveByWorkspaceId(any());
     }
 }

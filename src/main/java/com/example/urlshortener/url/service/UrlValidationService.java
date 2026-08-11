@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -32,6 +33,12 @@ public class UrlValidationService {
             throw new BadRequestException("originalUrl must contain a valid host");
         }
         validateHost(host);
+    }
+
+    public String validatedDestinationHost(String originalUrl) {
+        validateOriginalUrl(originalUrl);
+        String host = parseUri(originalUrl).getHost();
+        return host == null ? null : host.toLowerCase(Locale.ROOT);
     }
 
     public void validateCustomAlias(String customAlias) {

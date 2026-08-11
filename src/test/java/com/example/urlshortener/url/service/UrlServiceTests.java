@@ -1,20 +1,33 @@
 package com.example.urlshortener.url.service;
 
+import com.example.urlshortener.campaign.repository.CampaignRepository;
+import com.example.urlshortener.audit.service.AuditService;
+import com.example.urlshortener.audit.entity.AuditActorType;
 import com.example.urlshortener.common.exception.BadRequestException;
+import com.example.urlshortener.common.exception.PreconditionFailedException;
 import com.example.urlshortener.common.exception.ResourceNotFoundException;
 import com.example.urlshortener.common.metrics.AppMetrics;
 import com.example.urlshortener.common.ratelimit.RateLimiterService;
+import com.example.urlshortener.outbox.domain.DomainEventPublisher;
+import com.example.urlshortener.tag.service.TagService;
 import com.example.urlshortener.url.config.ShortCodeProperties;
 import com.example.urlshortener.url.dto.CreateShortUrlRequest;
+import com.example.urlshortener.url.dto.ShortUrlResponse;
+import com.example.urlshortener.url.dto.UpdateDestinationRequest;
 import com.example.urlshortener.url.dto.UpdateShortUrlRequest;
 import com.example.urlshortener.url.entity.ShortUrlEntity;
 import com.example.urlshortener.url.repository.ShortUrlRepository;
+import com.example.urlshortener.url.search.UrlStateResolver;
 import com.example.urlshortener.user.entity.UserEntity;
 import com.example.urlshortener.user.entity.UserRole;
 import com.example.urlshortener.user.entity.UserStatus;
 import com.example.urlshortener.user.repository.UserRepository;
 import com.example.urlshortener.user.service.CurrentOwnerProvider;
 import com.example.urlshortener.user.service.OwnerIdentity;
+import com.example.urlshortener.workspace.entity.WorkspaceEntity;
+import com.example.urlshortener.workspace.entity.WorkspaceRole;
+import com.example.urlshortener.workspace.service.WorkspaceContext;
+import com.example.urlshortener.workspace.service.WorkspaceContextResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -50,6 +63,15 @@ class UrlServiceTests {
     private AppMetrics metrics;
     private ShortCodeProperties shortCodeProperties;
     private UrlQuotaService quotaService;
+    private PublicUrlBuilder publicUrlBuilder;
+    private WorkspaceContextResolver workspaceContextResolver;
+    private AuditService auditService;
+    private DomainEventPublisher domainEventPublisher;
+    private CampaignRepository campaignRepository;
+    private TagService tagService;
+    private UrlStateResolver stateResolver;
+    private WorkspaceEntity workspace;
+    private UUID workspaceId;
     private UrlService urlService;
 
     @BeforeEach
@@ -64,7 +86,22 @@ class UrlServiceTests {
         metrics = Mockito.mock(AppMetrics.class);
         shortCodeProperties = new ShortCodeProperties();
         quotaService = Mockito.mock(UrlQuotaService.class);
-        urlService = new UrlService(shortUrlRepository, validationService, shortCodeGenerator, ownerProvider, userRepository, eventPublisher, rateLimiter, metrics, shortCodeProperties, quotaService);
+        publicUrlBuilder = Mockito.mock(PublicUrlBuilder.class);
+        workspaceContextResolver = Mockito.mock(WorkspaceContextResolver.class);
+        auditService = Mockito.mock(AuditService.class);
+        domainEventPublisher = Mockito.mock(DomainEventPublisher.class);
+        campaignRepository = Mockito.mock(CampaignRepository.class);
+        tagService = Mockito.mock(TagService.class);
+        stateResolver = Mockito.mock(UrlStateResolver.class);
+        workspaceId = UUID.randomUUID();
+        workspace = new WorkspaceEntity(workspaceId, "Test Workspace", true, null);
+        when(workspaceContextResolver.resolveForLinkWriter(any())).thenReturn(new WorkspaceContext(workspaceId, UUID.randomUUID(), AuditActorType.USER, WorkspaceRole.OWNER, workspace));
+        when(workspaceContextResolver.resolveForLinkReader(any())).thenReturn(new WorkspaceContext(workspaceId, UUID.randomUUID(), AuditActorType.USER, WorkspaceRole.OWNER, workspace));
+        when(publicUrlBuilder.shortUrl(any())).thenAnswer(invocation -> "http://localhost:8080/r/" + invocation.getArgument(0));
+        when(validationService.validatedDestinationHost(any())).thenReturn("example.com");
+        when(tagService.resolveOrCreate(any(), any())).thenReturn(java.util.Set.of());
+        when(stateResolver.state(any())).thenReturn("ACTIVE");
+        urlService = new UrlService(shortUrlRepository, validationService, shortCodeGenerator, ownerProvider, userRepository, eventPublisher, rateLimiter, metrics, shortCodeProperties, quotaService, publicUrlBuilder, workspaceContextResolver, auditService, domainEventPublisher, campaignRepository, tagService, stateResolver);
     }
 
     @Test
@@ -80,8 +117,10 @@ class UrlServiceTests {
         when(shortUrlRepository.existsByShortCode("ABC1234")).thenReturn(false);
         when(shortUrlRepository.save(any(ShortUrlEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThat(urlService.create(request).getShortCode()).isEqualTo("ABC1234");
-        verify(quotaService).enforceCreateQuota(owner, request);
+        ShortUrlResponse response = urlService.create(request);
+        assertThat(response.getShortCode()).isEqualTo("ABC1234");
+        assertThat(response.getShortUrl()).isEqualTo("http://localhost:8080/r/ABC1234");
+        verify(quotaService).enforceCreateQuota(workspaceId, request);
         verify(metrics).shortCodeGeneration("success");
     }
 
@@ -164,7 +203,7 @@ class UrlServiceTests {
         UserEntity owner = new UserEntity(UUID.randomUUID(), PLACEHOLDER_EMAIL, "", UserRole.USER, UserStatus.ACTIVE);
         when(ownerProvider.getCurrentOwner()).thenReturn(new OwnerIdentity(owner.getId(), PLACEHOLDER_EMAIL, UserRole.USER));
         when(userRepository.getReferenceById(owner.getId())).thenReturn(owner);
-        when(shortUrlRepository.findByIdAndOwner(id, owner)).thenReturn(Optional.empty());
+        when(shortUrlRepository.findByIdAndWorkspaceId(id, workspaceId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> urlService.get(id))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -174,10 +213,10 @@ class UrlServiceTests {
     void getShouldReturnOwnedUrl() {
         UUID id = UUID.randomUUID();
         UserEntity owner = new UserEntity(UUID.randomUUID(), PLACEHOLDER_EMAIL, "", UserRole.USER, UserStatus.ACTIVE);
-        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com", null, owner, LocalDateTime.now().plusDays(1));
+        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com", null, owner, workspace, LocalDateTime.now().plusDays(1));
         when(ownerProvider.getCurrentOwner()).thenReturn(new OwnerIdentity(owner.getId(), PLACEHOLDER_EMAIL, UserRole.USER));
         when(userRepository.getReferenceById(owner.getId())).thenReturn(owner);
-        when(shortUrlRepository.findByIdAndOwner(id, owner)).thenReturn(Optional.of(entity));
+        when(shortUrlRepository.findByIdAndWorkspaceId(id, workspaceId)).thenReturn(Optional.of(entity));
 
         assertThat(urlService.get(id).getId()).isEqualTo(id);
     }
@@ -188,7 +227,7 @@ class UrlServiceTests {
         UserEntity owner = new UserEntity(UUID.randomUUID(), PLACEHOLDER_EMAIL, "", UserRole.USER, UserStatus.ACTIVE);
         when(ownerProvider.getCurrentOwner()).thenReturn(new OwnerIdentity(owner.getId(), PLACEHOLDER_EMAIL, UserRole.USER));
         when(userRepository.getReferenceById(owner.getId())).thenReturn(owner);
-        when(shortUrlRepository.findByIdAndOwner(id, owner)).thenReturn(Optional.empty());
+        when(shortUrlRepository.findByIdAndWorkspaceId(id, workspaceId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> urlService.get(id))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -201,8 +240,8 @@ class UrlServiceTests {
         when(ownerProvider.getCurrentOwner()).thenReturn(new OwnerIdentity(owner.getId(), PLACEHOLDER_EMAIL, UserRole.USER));
         when(userRepository.getReferenceById(owner.getId())).thenReturn(owner);
 
-        ShortUrlEntity entity = new ShortUrlEntity(UUID.randomUUID(), "ABC1234", "https://example.com", null, owner, LocalDateTime.now().plusDays(1));
-        when(shortUrlRepository.findByOwner(owner, PageRequest.of(0, 20))).thenReturn(new PageImpl<>(Collections.singletonList(entity)));
+        ShortUrlEntity entity = new ShortUrlEntity(UUID.randomUUID(), "ABC1234", "https://example.com", null, owner, workspace, LocalDateTime.now().plusDays(1));
+        when(shortUrlRepository.findByWorkspaceId(workspaceId, PageRequest.of(0, 20))).thenReturn(new PageImpl<>(Collections.singletonList(entity)));
 
         Page<?> page = urlService.list(0, 20);
         assertThat(page.getContent()).hasSize(1);
@@ -213,37 +252,73 @@ class UrlServiceTests {
         UserEntity owner = new UserEntity(UUID.randomUUID(), PLACEHOLDER_EMAIL, "", UserRole.USER, UserStatus.ACTIVE);
         when(ownerProvider.getCurrentOwner()).thenReturn(new OwnerIdentity(owner.getId(), PLACEHOLDER_EMAIL, UserRole.USER));
         when(userRepository.getReferenceById(owner.getId())).thenReturn(owner);
-        when(shortUrlRepository.findByOwner(owner, PageRequest.of(2, 5))).thenReturn(Page.empty());
+        when(shortUrlRepository.findByWorkspaceId(workspaceId, PageRequest.of(2, 5))).thenReturn(Page.empty());
 
         Page<?> page = urlService.list(2, 5);
 
         assertThat(page.getContent()).isEmpty();
-        verify(shortUrlRepository).findByOwner(owner, PageRequest.of(2, 5));
+        verify(shortUrlRepository).findByWorkspaceId(workspaceId, PageRequest.of(2, 5));
     }
 
     @Test
     void updateExpirationShouldUpdateOwnedUrl() {
         UUID id = UUID.randomUUID();
         UserEntity owner = new UserEntity(UUID.randomUUID(), PLACEHOLDER_EMAIL, "", UserRole.USER, UserStatus.ACTIVE);
-        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com", null, owner, LocalDateTime.now().plusDays(1));
+        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com", null, owner, workspace, LocalDateTime.now().plusDays(1));
         UpdateShortUrlRequest request = new UpdateShortUrlRequest();
         request.setExpiresAt(LocalDateTime.now().plusDays(3));
         when(ownerProvider.getCurrentOwner()).thenReturn(new OwnerIdentity(owner.getId(), PLACEHOLDER_EMAIL, UserRole.USER));
         when(userRepository.getReferenceById(owner.getId())).thenReturn(owner);
-        when(shortUrlRepository.findByIdAndOwner(id, owner)).thenReturn(Optional.of(entity));
+        when(shortUrlRepository.findByIdAndWorkspaceId(id, workspaceId)).thenReturn(Optional.of(entity));
         when(shortUrlRepository.save(entity)).thenReturn(entity);
 
         assertThat(urlService.updateExpiration(id, request).getExpiresAt()).isEqualTo(request.getExpiresAt());
     }
 
     @Test
+    void updateDestinationShouldRequireMatchingEntityVersionAndInvalidateCache() {
+        UUID id = UUID.randomUUID();
+        UserEntity owner = new UserEntity(UUID.randomUUID(), PLACEHOLDER_EMAIL, "", UserRole.USER, UserStatus.ACTIVE);
+        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com/old", null, owner, workspace, LocalDateTime.now().plusDays(1));
+        UpdateDestinationRequest request = new UpdateDestinationRequest();
+        request.setOriginalUrl("https://example.com/new");
+        when(ownerProvider.getCurrentOwner()).thenReturn(new OwnerIdentity(owner.getId(), PLACEHOLDER_EMAIL, UserRole.USER));
+        when(userRepository.getReferenceById(owner.getId())).thenReturn(owner);
+        when(shortUrlRepository.findByIdAndWorkspaceId(id, workspaceId)).thenReturn(Optional.of(entity));
+        when(shortUrlRepository.save(entity)).thenReturn(entity);
+
+        ShortUrlResponse response = urlService.updateDestination(id, request, entity.getVersion());
+
+        assertThat(response.getOriginalUrl()).isEqualTo("https://example.com/new");
+        assertThat(entity.getShortCode()).isEqualTo("ABC1234");
+        verify(validationService).validatedDestinationHost("https://example.com/new");
+        verify(eventPublisher).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void updateDestinationShouldRejectStaleVersion() {
+        UUID id = UUID.randomUUID();
+        UserEntity owner = new UserEntity(UUID.randomUUID(), PLACEHOLDER_EMAIL, "", UserRole.USER, UserStatus.ACTIVE);
+        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com/old", null, owner, workspace, LocalDateTime.now().plusDays(1));
+        UpdateDestinationRequest request = new UpdateDestinationRequest();
+        request.setOriginalUrl("https://example.com/new");
+        when(ownerProvider.getCurrentOwner()).thenReturn(new OwnerIdentity(owner.getId(), PLACEHOLDER_EMAIL, UserRole.USER));
+        when(userRepository.getReferenceById(owner.getId())).thenReturn(owner);
+        when(shortUrlRepository.findByIdAndWorkspaceId(id, workspaceId)).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(() -> urlService.updateDestination(id, request, entity.getVersion() + 1))
+                .isInstanceOf(PreconditionFailedException.class);
+        verify(shortUrlRepository, never()).save(entity);
+    }
+
+    @Test
     void disableAndEnableShouldChangeOwnedUrlState() {
         UUID id = UUID.randomUUID();
         UserEntity owner = new UserEntity(UUID.randomUUID(), PLACEHOLDER_EMAIL, "", UserRole.USER, UserStatus.ACTIVE);
-        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com", null, owner, LocalDateTime.now().plusDays(1));
+        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com", null, owner, workspace, LocalDateTime.now().plusDays(1));
         when(ownerProvider.getCurrentOwner()).thenReturn(new OwnerIdentity(owner.getId(), PLACEHOLDER_EMAIL, UserRole.USER));
         when(userRepository.getReferenceById(owner.getId())).thenReturn(owner);
-        when(shortUrlRepository.findByIdAndOwner(id, owner)).thenReturn(Optional.of(entity));
+        when(shortUrlRepository.findByIdAndWorkspaceId(id, workspaceId)).thenReturn(Optional.of(entity));
         when(shortUrlRepository.save(entity)).thenReturn(entity);
 
         assertThat(urlService.disable(id).isEnabled()).isFalse();
@@ -254,11 +329,11 @@ class UrlServiceTests {
     void ownerShouldNotEnableAdministrativelyBlockedUrl() {
         UUID id = UUID.randomUUID();
         UserEntity owner = new UserEntity(UUID.randomUUID(), PLACEHOLDER_EMAIL, "", UserRole.USER, UserStatus.ACTIVE);
-        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com", null, owner, LocalDateTime.now().plusDays(1));
+        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com", null, owner, workspace, LocalDateTime.now().plusDays(1));
         entity.setBlocked(true);
         when(ownerProvider.getCurrentOwner()).thenReturn(new OwnerIdentity(owner.getId(), PLACEHOLDER_EMAIL, UserRole.USER));
         when(userRepository.getReferenceById(owner.getId())).thenReturn(owner);
-        when(shortUrlRepository.findByIdAndOwner(id, owner)).thenReturn(Optional.of(entity));
+        when(shortUrlRepository.findByIdAndWorkspaceId(id, workspaceId)).thenReturn(Optional.of(entity));
 
         assertThatThrownBy(() -> urlService.enable(id))
                 .isInstanceOf(BadRequestException.class)
@@ -269,7 +344,8 @@ class UrlServiceTests {
     void adminBlockAndUnblockShouldBeIdempotentAndInvalidateCacheOnlyOnChange() {
         UUID id = UUID.randomUUID();
         UserEntity owner = new UserEntity(UUID.randomUUID(), PLACEHOLDER_EMAIL, "", UserRole.USER, UserStatus.ACTIVE);
-        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com", null, owner, LocalDateTime.now().plusDays(1));
+        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com", null, owner, workspace, LocalDateTime.now().plusDays(1));
+        when(ownerProvider.getCurrentOwner()).thenReturn(new OwnerIdentity(UUID.randomUUID(), "admin@example.com", UserRole.ADMIN));
         when(shortUrlRepository.findById(id)).thenReturn(Optional.of(entity));
         when(shortUrlRepository.save(entity)).thenReturn(entity);
 
@@ -287,10 +363,10 @@ class UrlServiceTests {
     void deleteShouldSoftDeleteOnlyOwnedUrl() {
         UUID id = UUID.randomUUID();
         UserEntity owner = new UserEntity(UUID.randomUUID(), PLACEHOLDER_EMAIL, "", UserRole.USER, UserStatus.ACTIVE);
-        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com", null, owner, LocalDateTime.now().plusDays(1));
+        ShortUrlEntity entity = new ShortUrlEntity(id, "ABC1234", "https://example.com", null, owner, workspace, LocalDateTime.now().plusDays(1));
         when(ownerProvider.getCurrentOwner()).thenReturn(new OwnerIdentity(owner.getId(), PLACEHOLDER_EMAIL, UserRole.USER));
         when(userRepository.getReferenceById(owner.getId())).thenReturn(owner);
-        when(shortUrlRepository.findByIdAndOwner(id, owner)).thenReturn(Optional.of(entity));
+        when(shortUrlRepository.findByIdAndWorkspaceId(id, workspaceId)).thenReturn(Optional.of(entity));
 
         urlService.delete(id);
 
@@ -306,7 +382,7 @@ class UrlServiceTests {
         UserEntity owner = new UserEntity(UUID.randomUUID(), PLACEHOLDER_EMAIL, "", UserRole.USER, UserStatus.ACTIVE);
         when(ownerProvider.getCurrentOwner()).thenReturn(new OwnerIdentity(owner.getId(), PLACEHOLDER_EMAIL, UserRole.USER));
         when(userRepository.getReferenceById(owner.getId())).thenReturn(owner);
-        when(shortUrlRepository.findByIdAndOwner(id, owner)).thenReturn(Optional.empty());
+        when(shortUrlRepository.findByIdAndWorkspaceId(id, workspaceId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> urlService.delete(id))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -329,3 +405,4 @@ class UrlServiceTests {
                 .hasMessageContaining("expiresAt must be a future timestamp");
     }
 }
+

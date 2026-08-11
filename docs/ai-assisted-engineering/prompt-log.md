@@ -25,6 +25,9 @@ This document records the major prompts used during AI-assisted planning and imp
 | P-019 | Final documentation synchronization | Perform final README and documentation synchronization pass without feature work | Reconciled README, docs index, stale phase language, coverage values, local startup instructions, and k6 request schema | Edited |
 | P-020 | Hyperscale production evolution | Evolve the validated baseline toward 100M new URLs/day without rewriting or adding distributed infrastructure | Added hyperscale NFR/capacity/architecture docs, configurable 8-character Base62 generation, collision metrics, config-driven quotas, V4 blocked moderation, admin block/unblock, tests, and traceability | Edited |
 | P-021 | Render live deployment configuration | Prepare deployment configuration for Render Web Service, Neon PostgreSQL, and Render Key Value without feature or architecture changes | Added `prod` profile, Render port support, Docker JAR runtime, deployment variable template, deployment docs, README links, and secret-ignore hardening | Edited |
+| P-022 | Enterprise production evolution Stages 1-3 | Implement approved public short URL representation, idempotent URL creation, and destination editing with optimistic HTTP concurrency | Added derived `shortUrl`, V5 idempotency table, optional `Idempotency-Key`, destination PATCH with ETag/If-Match, tests, and docs | Edited |
+| P-023 | Stage 4 workspace tenant foundation and workspace RBAC | Implement workspace tenant foundation and workspace RBAC only | Added V6 workspaces/memberships, default workspace provisioning, workspace role checks, workspace-scoped URL/analytics/idempotency behavior, tests, and docs | Edited |
+| P-024 | Stage 5 immutable enterprise audit trail | Implement immutable enterprise audit trail only | Added V7 audit events, audit entities/repository/service/query APIs, transactional audit hooks for URL/workspace/membership/moderation mutations, bounded/redacted metadata, tests, and docs | Edited |
 
 ## P-013 Validation Notes
 
@@ -283,6 +286,99 @@ Hard-coding Render or Neon hostnames, adding a new Redis client dependency, and 
 
 Changing the Docker entrypoint back to Maven `spring-boot:run` was rejected because Render runtime should execute the packaged application artifact, not run Maven in production.
 
+## P-022 Validation Notes
+
+- Scope: enterprise production evolution Stages 1-3 only. Workspace migration, audit, API keys, outbox, analytics abstraction, mapping-store abstraction, QR codes, tracing, and Angular frontend were not started.
+- Approved migration: added `V5__idempotency_keys.sql`; V1-V4 were not modified.
+- Implemented:
+  - `APP_PUBLIC_BASE_URL` and derived `shortUrl` response field. Full short URLs are not persisted.
+  - Optional `Idempotency-Key` support for `POST /api/v1/urls`, scoped to the authenticated user.
+  - SHA-256 request fingerprints and PostgreSQL unique constraint `(scope, idempotency_key)` as the authoritative concurrency boundary.
+  - Same key plus same request replays the original successful response; same key plus different request returns RFC7807 HTTP 409.
+  - `PATCH /api/v1/urls/{id}/destination` updates `short_urls.original_url`, preserves the short code and analytics history, validates the destination, enforces ownership, and invalidates redirect cache after commit.
+  - `ETag` on URL management responses and required `If-Match` for destination changes to prevent silent lost updates.
+- Focused validation:
+  - `.\mvnw.cmd -q "-Dtest=UrlServiceTests,UrlControllerIntegrationTests" test` passed.
+  - PostgreSQL Testcontainers started successfully.
+  - Flyway validated and applied V1-V5.
+  - Hibernate schema validation succeeded.
+- Full validation:
+  - `.\mvnw.cmd clean verify` passed with 89 tests and JaCoCo line coverage 85.83% / branch coverage 65.58%.
+  - PostgreSQL and Redis Testcontainers started successfully.
+  - Flyway validated and applied V1-V5.
+  - Hibernate schema validation succeeded.
+  - `.\mvnw.cmd dependency:tree` passed and confirmed no new production dependency.
+  - `docker compose config` passed without warnings.
+- Defect found during full validation:
+  - Existing JWT tampering test used a brittle last-two-character mutation that did not always invalidate the token. The test was edited to append an extra character, preserving the security assertion without changing production auth behavior.
+
+## P-023 Validation Notes
+
+- Scope: Stage 4 workspace/tenant foundation and workspace RBAC only.
+- Explicitly not started: audit/event table, API keys, outbox, tags/campaigns/search, QR codes, tracing, Angular frontend, and Stage 5 work.
+- Approved migration: added `V6__workspaces_and_memberships.sql`; V1-V5 were not modified.
+- Implemented:
+  - `workspaces`, `workspace_memberships`, and `WorkspaceRole` with `OWNER`, `ADMIN`, `EDITOR`, `ANALYST`, and `VIEWER`.
+  - `short_urls.workspace_id` with backfill for existing users/URLs, not-null constraint, foreign key, and workspace indexes.
+  - Default workspace plus `OWNER` membership creation during registration.
+  - Central workspace authorization service and resolver using optional `X-Workspace-ID`; absent header falls back to default workspace, invalid/unauthorized explicit header does not.
+  - URL management and owner analytics repository queries now include `workspace_id`; public redirects remain unchanged.
+  - `short_urls.owner_id` retained as creator/legacy actor metadata, not the tenant boundary.
+  - Idempotent URL creation scope changed to workspace + actor + operation + key while preserving V5 storage.
+  - Workspace APIs for listing/creating workspaces and managing existing-user memberships.
+  - URL quotas now count workspace resources while request rate limiting remains user/request scoped.
+  - Stage 5 audit-hook candidates identified but not implemented: `WORKSPACE_CREATED`, `MEMBER_ADDED`, `MEMBER_ROLE_CHANGED`, and `MEMBER_REMOVED`.
+- Defects found and corrected:
+  - Workspace controller path variables initially depended on compiler parameter metadata; fixed with explicit `@PathVariable` names.
+  - Integration fixture created duplicate default workspaces for registered users; fixed to reuse existing default membership.
+- Validation:
+  - `.\mvnw.cmd -q -Dtest=WorkspaceControllerIntegrationTests test` passed.
+  - `.\mvnw.cmd clean verify` passed with 92 tests and JaCoCo line coverage 84.48% / branch coverage 63.42%.
+  - Flyway validated and applied V1-V6.
+  - Hibernate schema validation succeeded.
+  - `.\mvnw.cmd dependency:tree` passed with no new production dependency.
+  - `docker compose config` passed.
+
+## P-024 Validation Notes
+
+- Scope: Stage 5 immutable enterprise audit trail only.
+- Explicitly not started: API keys, transactional outbox, tags/campaigns/search, QR codes, tracing, Angular frontend, and distributed infrastructure.
+- Approved migration: added `V7__audit_events.sql`; V1-V6 were not modified.
+- Implemented:
+  - `AuditEventEntity`, `AuditAction`, `AuditActorType`, `AuditResourceType`, `AuditRepository`, `AuditService`, and `AuditQueryService`.
+  - Audit rows for URL create, destination change, expiration change, enable, disable, delete, admin block/unblock, workspace creation, member add, member role change, and member removal.
+  - Read-only audit APIs for workspace audit, URL audit, and explicit platform admin audit.
+  - Same-transaction audit insert behavior for business mutations where practical; audit persistence failure fails the mutation.
+  - Bounded safe metadata using `APP_AUDIT_METADATA_MAX_BYTES`; destination changes store hosts and SHA-256 hashes rather than raw URLs.
+  - No audit events for reads or public redirects.
+- Defects found and corrected:
+  - Audit controller parameters initially relied on compiler parameter metadata; fixed with explicit `@PathVariable` and `@RequestParam` names.
+  - Nullable JPQL filters caused PostgreSQL `could not determine data type of parameter` errors; replaced fixed nullable queries with dynamic JPA specifications.
+- Focused validation:
+  - `.\mvnw.cmd -q "-Dtest=com.example.urlshortener.audit.AuditTrailIntegrationTests,com.example.urlshortener.audit.AuditServiceTests" test` passed.
+  - PostgreSQL Testcontainers started, Flyway validated and applied V1-V7, and Hibernate schema validation succeeded.
+- Full validation:
+  - `.\mvnw.cmd clean verify` passed with 97 tests and JaCoCo line coverage 85.62% / branch coverage 62.80%.
+  - PostgreSQL and Redis Testcontainers started successfully.
+  - Flyway validated and applied V1-V7.
+  - Hibernate schema validation succeeded.
+  - `.\mvnw.cmd dependency:tree` passed with no new production dependency.
+  - `docker compose config` passed without warnings.
+
+## P-024 AI Output Examples
+
+### Accepted
+
+The AI-generated append-only audit table with UUID identifiers, workspace/actor/resource logical IDs, action/resource enums, correlation ID, schema version, and JSONB metadata was accepted because it supports queryability while preserving audit retention without cascading foreign keys.
+
+### Edited
+
+The initial audit query repository used nullable JPQL filters. It was edited to dynamic JPA specifications after PostgreSQL rejected ambiguous null timestamp parameters in Testcontainers.
+
+### Rejected
+
+Persisting raw destination URLs in audit metadata was rejected. Destination-change audit metadata stores only hostnames and SHA-256 hashes so sensitive query parameters are not exposed through audit APIs.
+
 ## AI was wrong example
 
 ### Prompt
@@ -319,3 +415,318 @@ GenericContainer<>("redis:7-alpine")
 ```
 
 Passed.
+
+## P-025 Stage 6 API Keys / Machine-To-Machine Authentication
+
+- Scope: Stage 6 API keys only.
+- Explicitly not started: transactional outbox, tracing, QR codes, frontend, distributed gateway/infrastructure, and Stage 7 work.
+- Approved migration: added `V8__api_keys.sql`; V1-V7 were not modified.
+- Implemented:
+  - Workspace-bound API-key table with non-cascading workspace/user references, unique prefix/digest constraints, expiration, revocation, last-used tracking, and optimistic versioning.
+  - API-key management endpoints for human workspace `OWNER`/`ADMIN` actors.
+  - Header-only API-key authentication through `X-API-Key`.
+  - One-time raw key return and HMAC-SHA-256 digest storage using `APP_API_KEY_HASH_PEPPER`.
+  - Machine scopes `links:read`, `links:write`, and `analytics:read` with workspace isolation.
+  - API-key rate limiter policy and generic RFC7807 401/429 behavior.
+  - API-key create/revoke audit events and API-key actor attribution for machine URL mutations.
+- Defects found and corrected:
+  - Raw key parsing was adjusted to avoid ambiguity when Base64URL secrets contain underscores.
+  - The API-key filter was disabled for servlet auto-registration and kept only in the Spring Security chain.
+  - Rate-limit exceptions thrown from the filter path were handled directly as RFC7807 429 responses because MVC exception advice does not handle pre-controller filter failures.
+- Focused validation:
+  - `.\mvnw.cmd -q -Dtest=ApiKeyIntegrationTests test` passed.
+  - PostgreSQL Testcontainers started, Flyway validated and applied V1-V8, and Hibernate schema validation succeeded.
+- Full validation:
+  - `.\mvnw.cmd clean verify` passed with 105 tests and JaCoCo line coverage 87.09% / branch coverage 63.87%.
+  - PostgreSQL and Redis Testcontainers started successfully.
+  - Flyway validated and applied V1-V8.
+  - Hibernate schema validation succeeded.
+  - `.\mvnw.cmd dependency:tree` passed with no new production dependency.
+  - `docker compose config` passed without warnings.
+
+## P-025 AI Output Examples
+
+### Accepted
+
+The HMAC-backed API-key storage model was accepted because it avoids storing raw bearer credentials while still allowing deterministic verification by prefix lookup and constant-time digest comparison.
+
+### Edited
+
+The generated key format and parser were edited so underscores inside the Base64URL secret do not corrupt parsing. The filter integration was also edited to avoid duplicate servlet registration.
+
+### Rejected
+
+Granting API keys broad `ROLE_ADMIN` or workspace-management permissions was rejected. Machine credentials are restricted to explicit URL and analytics scopes in one workspace.
+
+## P-026 Stage 7 Transactional Outbox And Durable Event Delivery
+
+- Scope: Stage 7 transactional outbox only.
+- Explicitly not started: tracing, QR codes, frontend, external broker infrastructure, distributed gateway, and Stage 8 work.
+- Approved migration: `V9__outbox_events.sql`; V1-V8 were not modified.
+- Implemented:
+  - PostgreSQL `outbox_events` table with `PENDING`, `PROCESSING`, `PROCESSED`, and `DEAD` states.
+  - Same-transaction `DomainEventPublisher` implementation backed by PostgreSQL.
+  - URL mutation events for create, destination change, expiration change, enable, disable, delete, block, and unblock.
+  - Durable cache invalidation events while retaining immediate after-commit Redis invalidation.
+  - Bounded dispatcher using PostgreSQL `FOR UPDATE SKIP LOCKED`, claim timeout recovery, exponential backoff with jitter, max attempts, and dead-letter state.
+  - Handler abstraction for cache invalidation, analytics outbox events, and URL mutation event delivery placeholders.
+  - `APP_ANALYTICS_PUBLISHER=local|outbox`, defaulting to `local` in all profiles.
+  - Read-only platform-admin outbox inspection endpoint with safe DTOs and no raw payload exposure.
+  - Low-cardinality outbox metrics and processed-row cleanup.
+- Defects found and corrected:
+  - Outbox integration tests initially inserted timestamps using the machine-local clock while the application clock is UTC, making test rows appear scheduled in the future. The test helper was corrected to use the application `Clock`.
+  - Admin outbox query parameters were made explicit because this Maven build does not compile Java parameter names for Spring MVC inference.
+- Focused validation:
+  - `.\mvnw.cmd -q "-Dtest=OutboxIntegrationTests,OutboxRollbackIntegrationTests" test` passed.
+  - PostgreSQL Testcontainers started, Flyway validated and applied V1-V9, and Hibernate schema validation succeeded.
+- Full validation:
+  - `.\mvnw.cmd clean verify` passed with 113 tests and JaCoCo line coverage 85.15% / branch coverage 60.53%.
+  - PostgreSQL and Redis Testcontainers started successfully.
+  - Flyway validated and applied V1-V9.
+  - Hibernate schema validation succeeded.
+  - `.\mvnw.cmd dependency:tree` passed with no new production dependency.
+  - `docker compose config` passed without warnings.
+
+## P-026 AI Output Examples
+
+### Accepted
+
+The PostgreSQL transactional outbox design using `FOR UPDATE SKIP LOCKED`, bounded workers, at-least-once delivery, and handler idempotency was accepted because it meets the durability requirement without adding unapproved infrastructure.
+
+### Edited
+
+The analytics publisher design was edited to keep `APP_ANALYTICS_PUBLISHER=local` as the default in every profile. Outbox-backed analytics remains opt-in because it adds a PostgreSQL write to the redirect path and is not the hyperscale click-stream target.
+
+### Rejected
+
+Adding a public retry endpoint for dead-lettered outbox rows was rejected. Stage 7 exposes only read-only platform-admin inspection; operational repair remains a documented manual procedure.
+
+## P-027 Stage 8 Campaigns, Tags, Search, Filtering, And Large-Workspace UX
+
+- Scope: Stage 8 campaigns, tags, search, filtering, and large-workspace UX only.
+- Explicitly not started: Angular/frontend, QR codes, tracing, search-specific cache, distributed search infrastructure, separate search limiter, and Stage 9 work.
+- Approved migration: `V10__campaigns_tags_and_search.sql`; V1-V9 were not modified.
+- Implemented:
+  - Workspace-scoped campaigns with soft delete, active normalized-name uniqueness, audit events, and synchronous URL detach on delete.
+  - Workspace-scoped normalized tags with relational `url_tags` assignments.
+  - Additive URL create `campaignId` and `tags` request fields.
+  - URL metadata endpoints `PATCH /api/v1/urls/{id}/campaign` and `PUT /api/v1/urls/{id}/tags`, both protected by `If-Match`.
+  - Bounded PostgreSQL-backed URL search/filtering with allowlisted sort fields and page-size limits.
+  - Destination host derivation through the existing URL validation path.
+  - API-key access boundaries: read campaign/tag metadata and write URL metadata, but no campaign lifecycle management.
+  - Campaign/tag audit actions and bounded metadata.
+  - k6 scripts for URL list/search plus campaign and tag filters.
+- Defects found and corrected:
+  - Initial Spring Data derived repository methods referenced `workspaceId` where the entity property is `workspace.id`; those were replaced with explicit JPQL.
+  - Initial search response enrichment touched campaign metadata through lazy row access; it was edited to batch-fetch campaign summaries and tags after page selection.
+- Validation:
+  - `docker info` passed with Docker Desktop server 29.6.1.
+  - `.\mvnw.cmd -q -Dtest=OrganizationSearchIntegrationTests test` passed.
+  - `.\mvnw.cmd clean verify` passed with 118 backend tests and JaCoCo line 85.11% / branch 60.78%.
+  - PostgreSQL and Redis Testcontainers started successfully.
+  - Flyway validated and applied V1-V10.
+  - Hibernate schema validation succeeded.
+  - `.\mvnw.cmd dependency:tree` passed.
+  - `docker compose config` passed with a non-fatal local Docker config access warning in this shell.
+- Defects found after Flyway startup and corrected:
+  - Stale `idempotency_records` cleanup corrected to `idempotency_keys`.
+  - Explicit `@PathVariable` names added to Stage 8 controllers for Maven builds without Java parameter-name inference.
+  - Missing `PUT /api/v1/urls/**` authorization added for tag replacement.
+  - Idempotency normalization test made deterministic by using one expiration timestamp.
+  - Campaignless search results fixed to avoid `Map.of().get(null)`.
+
+## P-027 AI Output Examples
+
+### Accepted
+
+The relational tag model and PostgreSQL-backed bounded search were accepted because they satisfy large-workspace filtering without adding unapproved search infrastructure or high-risk dependencies.
+
+### Edited
+
+Search enrichment was edited from direct lazy campaign/tag access to batched campaign and tag lookup after selecting the URL page.
+
+### Rejected
+
+Searching raw destination URL query strings was rejected because those values may contain sensitive data. Only derived destination host is searchable.
+
+## P-028 Stage 9A Angular Production Frontend Foundation
+
+- Scope: Stage 9A foundation only.
+- Explicitly not started: Stage 9B link management, Stage 9C enterprise views, Stage 9D hardening, backend API changes, backend auth/cookie policy changes, Angular Material, PrimeNG, Bootstrap, Tailwind, NgRx, chart libraries, OpenAPI generator, Playwright, Cypress, and frontend monitoring SDKs.
+- Implemented:
+  - Angular 22.1.3 standalone frontend in `frontend/`.
+  - Runtime `public/app-config.json` loaded before application bootstrap.
+  - Typed auth and workspace API clients using real backend DTO shapes.
+  - RFC7807 Problem Details mapping with correlation ID and `Retry-After` support.
+  - Memory-only access-token state using Signals.
+  - Startup CSRF bootstrap through existing public liveness response behavior before one refresh attempt.
+  - Refresh single-flight for concurrent refresh callers.
+  - Functional auth, workspace, and error interceptors.
+  - Auth/guest/admin route guards.
+  - Login and registration forms with validation and loading/error states.
+  - Authenticated layout with workspace selector and dashboard foundation.
+  - Frontend docs and CI additions.
+- Validation:
+  - Node `v24.18.0`, npm `11.16.0`.
+  - `npm ci` passed.
+  - `npm test -- --watch=false` passed with 7 tests.
+  - `npm run build` passed; initial bundle 264.00 kB raw / 71.95 kB estimated transfer.
+  - Backend regression `.\mvnw.cmd clean verify` passed with 118 backend tests and JaCoCo line 85.11% / branch 60.78%.
+  - `.\mvnw.cmd dependency:tree` passed.
+  - `docker compose config` passed with a non-fatal local Docker config access warning.
+- Remaining warning:
+  - `npm audit --audit-level=moderate` reports 3 moderate Angular CLI dev-dependency-chain findings through `@modelcontextprotocol/sdk` and `@hono/node-server`.
+  - The suggested forced fix would downgrade Angular CLI to 21.0.4, so it was rejected to preserve the approved Angular 22 baseline.
+
+## P-028 AI Output Examples
+
+### Accepted
+
+The memory-only access-token state, typed API client boundary, functional interceptors, lazy auth/dashboard routes, and single-flight refresh structure were accepted because they match the approved Stage 9A scope without adding state-management or UI libraries.
+
+### Edited
+
+The initial frontend DTO shape was edited after inspecting backend Java records: auth responses use `expiresAt`, and workspace responses do not include `createdAt`. The startup flow was also edited to bootstrap the CSRF cookie through existing liveness behavior before refresh.
+
+### Rejected
+
+Implementing URL create/search, campaigns/tags UI, analytics, audit, API-key management, admin views, and a frontend test framework beyond Angular's generated tooling was rejected because those belong to later Stage 9 substages or were explicitly not approved. `npm audit fix --force` was also rejected because it would downgrade the approved Angular 22 CLI baseline.
+
+## P-029 Stage 9B Production Link Management Experience
+
+- Scope: Stage 9B link-management experience only.
+- Explicitly not started: analytics UI, audit UI, API-key UI, workspace-member management UI, platform-admin UI, QR codes, custom domains, tracing, backend architecture changes, backend API contract changes, and Stage 9C work.
+- Implemented:
+  - Authenticated routes `/app/urls`, `/app/urls/new`, `/app/urls/:id`, and `/app/campaigns`.
+  - Workspace-aware URL dashboard with desktop table, mobile cards, empty/loading/error states, state badges, copy/open/detail actions, enable/disable/delete, and BLOCKED owner-action suppression.
+  - Filter and pagination query-param synchronization for q, state, campaign, tag, created/expiration ranges, custom-alias flag, allowlisted sort, page, and size.
+  - Stale URL-list response guard for rapid filter changes and workspace switching.
+  - Create-link Reactive Form using actual DTO fields: `originalUrl`, `customAlias`, `expiresAt`, `campaignId`, and `tags`.
+  - Idempotency key retained across retries for one create attempt and regenerated only for Create another.
+  - Link details page capturing `ETag` and sending `If-Match` for destination, campaign, and tag replacement mutations.
+  - Explicit conflict UX for `412`/`428` responses without silent mutation replay.
+  - Campaign list/create/edit/delete page with OWNER/ADMIN/EDITOR create-update affordances and OWNER/ADMIN delete affordances.
+  - Typed `UrlApi`, `CampaignApi`, and `TagApi` clients for existing backend contracts.
+  - Shared confirmation dialog, copy button, empty/error states, pagination, status badge, tag chip, tag normalization, idempotency, URL-state and workspace-permission utilities.
+  - Frontend documentation and root README synchronization for Stage 9B.
+- Validation:
+  - `npm ci` passed; known 3 moderate Angular CLI dev-dependency-chain vulnerabilities remain and `npm audit fix --force` remains rejected because it would downgrade Angular CLI.
+  - `npm test -- --watch=false` passed with 13 Angular tests.
+  - `npm run build` passed; initial bundle 100.65 kB raw / 26.07 kB estimated transfer, with lazy chunks for link dashboard, details, create and campaigns.
+  - `.\mvnw.cmd clean verify` passed with 118 backend tests; PostgreSQL and Redis Testcontainers started; Flyway V1-V10 validated/applied; Hibernate schema validation succeeded; JaCoCo line 85.11% / branch 60.78%.
+  - `.\mvnw.cmd dependency:tree` passed with no new backend production dependency.
+  - `docker compose config` passed.
+- Environment note:
+  - The local sandbox denied Angular compiler reads for source/style files and `node_modules`; frontend validation commands were rerun with scoped filesystem escalation and then passed.
+
+## P-029 AI Output Examples
+
+### Accepted
+
+The route-level lazy Angular link-management pages, handwritten typed API clients, idempotency-key utility, ETag mutation flow, and workspace-aware campaign/tag metadata loading were accepted because they match existing backend contracts without adding dependencies or backend changes.
+
+### Edited
+
+The dashboard request flow was edited to ignore stale URL-list responses after rapid filter changes or workspace switches. Template bindings were also corrected to match existing shared component input names.
+
+### Rejected
+
+Analytics, audit, API-key, workspace-member, platform-admin, QR-code, custom-domain and tracing UI work was rejected because it belongs to later Stage 9 substages. Backend API changes were not made because the inspected contracts already supported Stage 9B.
+
+## P-030 Stage 9C Enterprise Operations Frontend
+
+- Scope: Stage 9C enterprise operations frontend only.
+- Explicitly not started: Stage 9D deployment/hardening, backend migrations, backend dependencies, backend API contracts, QR codes, custom domains, tracing UI, chart libraries, NgRx, Material/PrimeNG/Bootstrap/Tailwind, OpenAPI generator, Playwright, Cypress, and telemetry SDKs.
+- Contract inspection source of truth:
+  - URL analytics: `GET /api/v1/urls/{id}/analytics` and `/analytics/daily`.
+  - Workspace audit: `GET /api/v1/workspaces/{workspaceId}/audit`.
+  - URL audit: `GET /api/v1/urls/{urlId}/audit`.
+  - API keys: `GET/POST /api/v1/workspaces/{workspaceId}/api-keys`, `POST /api-keys/{id}/revoke`.
+  - Workspace members: `GET/POST /api/v1/workspaces/{id}/members`, `PATCH/DELETE /members/{userId}`.
+  - Platform admin analytics: `GET /api/v1/admin/analytics/overview`, `/top-links`.
+  - Platform moderation: `POST /api/v1/admin/urls/{id}/block`, `/unblock`.
+  - Platform audit: `GET /api/v1/admin/audit`.
+  - Outbox visibility: `GET /api/v1/admin/outbox`.
+- Implemented:
+  - Lazy routes `/app/urls/:id/analytics`, `/app/audit`, `/app/api-keys`, `/app/workspace`, `/app/admin/overview`, `/app/admin/moderation`, `/app/admin/audit`, and `/app/admin/outbox`.
+  - URL analytics KPI/table view with zero-click empty state and no fabricated dimensions.
+  - Workspace audit and platform audit with server-side filters and pagination.
+  - URL-specific audit history embedded in URL details.
+  - API-key create/list/revoke using backend-supported scopes and one-time raw-key display.
+  - Workspace creation and membership list/add/role-change/remove.
+  - Platform ADMIN-only navigation and guard.
+  - Platform analytics overview/top links, block/unblock moderation, and read-only outbox visibility.
+  - Safe audit metadata allowlisting and text-only rendering.
+  - Frontend tests for enterprise clients and security utilities.
+- Validation:
+  - `npm ci` passed; known 3 moderate Angular CLI dev-dependency-chain vulnerabilities remain and `npm audit fix --force` remains rejected because it would downgrade Angular CLI.
+  - `npm test -- --watch=false` passed with 21 Angular tests.
+  - `npm run build` passed; initial bundle 103.64 kB raw / 26.71 kB estimated transfer.
+  - Stage 9B initial baseline was 100.65 kB raw / 26.09 kB estimated transfer; Stage 9C delta is +2.99 kB raw / +0.62 kB transfer.
+  - Largest Stage 9C feature lazy chunks: workspace-management 9.87 kB raw, api-keys 9.42 kB raw, workspace-audit 6.88 kB raw, admin-audit 6.79 kB raw, admin-outbox 6.58 kB raw.
+  - `npm audit --audit-level=moderate` reported 3 known moderate Angular CLI dev-chain findings through `@modelcontextprotocol/sdk` and `@hono/node-server`; forced remediation would downgrade Angular CLI to 21.0.4 and was not applied.
+  - `.\mvnw.cmd clean verify` passed with 118 backend tests and JaCoCo line 85.11% / branch 60.78%.
+  - PostgreSQL and Redis Testcontainers started successfully.
+  - Flyway V1-V10 validated/applied and Hibernate schema validation succeeded.
+  - `.\mvnw.cmd dependency:tree` passed and `docker compose config` passed.
+
+## P-030 AI Output Examples
+
+### Accepted
+
+The focused API clients, lazy route structure, API-key one-time secret panel, audit metadata allowlist, and read-only outbox page were accepted because they expose existing backend capabilities without adding dependencies or changing contracts.
+
+### Edited
+
+The initial operations UI was edited to avoid chart dependencies and to keep analytics as KPI cards plus accessible tables. The platform navigation was also tied to platform `ROLE_ADMIN` rather than workspace roles.
+
+### Rejected
+
+Outbox retry/replay/delete controls, API-key rotation/update, fabricated analytics dimensions, platform access for workspace OWNER, and raw audit metadata rendering were rejected because they are unsupported or unsafe for Stage 9C.
+
+## P-031 Stage 9D Production Deployment Hardening And Final Evidence
+
+- Scope: Stage 9D deployment hardening, release readiness, and final evidence only.
+- Explicitly not started: QR codes, custom domains, tracing UI, Kafka/Kinesis/Pulsar, distributed KV implementation, Redis Cluster code, Kubernetes manifests, billing, malware-provider integration, new analytics dimensions, backend migrations, backend business logic changes, backend auth redesign, and Stage 10 work.
+- Deployment audit findings:
+  - Backend `prod` profile already used environment-driven Neon PostgreSQL, Render Key Value/Valkey, Flyway, Hibernate validation, `PORT`, `SERVER_ADDRESS`, JWT, analytics pepper, rate-limit salt, CORS, quotas, outbox, and Actuator settings.
+  - Dockerfile already built and ran the Spring Boot executable JAR without copying secrets.
+  - Angular build output publishes to `frontend/dist/frontend/browser`.
+  - Gap found: frontend runtime config was only a checked-in local `app-config.json`; Render Static Site needed a reproducible way to write public runtime config from environment variables.
+  - Gap found: frontend Render Static Site rewrite/header configuration and production smoke flow were not documented.
+  - Gap found: release evidence docs needed live-vs-hyperscale architecture separation and frontend/backend rollback guidance.
+- Implemented:
+  - Added `frontend/scripts/write-app-config.mjs` and `npm run build:render` to generate browser-visible `app-config.json` from public frontend environment variables.
+  - Documented Render Static Site root, build command, publish directory, SPA rewrite, security headers, cache headers, CORS dependency, and SameSite Strict deployment risk.
+  - Added production smoke test documentation, release checklist, frontend deployment docs, and synchronized deployment indexes.
+  - Updated runbook, rollback guide, environment-variable docs, README, and architecture overview for Render Static Site + Render backend + Neon + Valkey.
+  - Updated CI to run frontend `npm audit --audit-level=high` while leaving the known moderate Angular CLI dev-dependency-chain findings documented rather than permanently failing CI.
+- Validation:
+  - `.\mvnw.cmd clean verify` passed with 118 backend tests and JaCoCo line 85.11% / branch 60.78%.
+  - PostgreSQL and Redis Testcontainers started; Flyway V1-V10 validated/applied; Hibernate schema validation succeeded.
+  - `.\mvnw.cmd dependency:tree` passed and confirmed Spring Boot-managed dependencies including Flyway core/PostgreSQL `11.7.2`, Redis starter `3.5.0`, Lettuce `6.5.5.RELEASE`, and Testcontainers `1.21.0`.
+  - `docker compose config` passed without warnings when run with normal Docker config access.
+  - `npm ci` passed with npm install-script review warnings for build tooling.
+  - `npm test -- --watch=false` passed with 21 Angular tests.
+  - `npm run build` passed with initial bundle 103.64 kB raw / 26.71 kB estimated transfer.
+  - `npm run build:render` passed and wrote public runtime config to `dist/frontend/browser/app-config.json`.
+  - `npm audit --audit-level=moderate` reported the known 3 moderate Angular CLI dev-dependency-chain findings through `@modelcontextprotocol/sdk` and `@hono/node-server`; `npm audit --audit-level=high` passed.
+  - `git diff --check` passed; repository secret scan found no committed secrets; compiled frontend scan found only ordinary UI password-label text, not secret values.
+  - k6 was unavailable locally, so no Stage 9D performance measurements were claimed.
+  - Live backend health checks timed out from this execution environment; live frontend cookie/CSRF/reload smoke validation remains pending until the frontend Render Static Site URL is available and reachable in a browser.
+  - Follow-up CI correction: GitHub Actions exposed a brittle assertion in `OutboxRollbackIntegrationTests.outboxFailureRollsBackRequiredUrlMutationAndAudit`; the test expected one total audit row even though registration/workspace setup can legitimately create multiple non-URL audit rows. The test was edited to clean before execution, capture setup audit count, and assert the failed URL mutation adds no `URL_CREATED` audit row and no `short_urls` row.
+  - Follow-up validation: focused `.\mvnw.cmd -q "-Dtest=OutboxRollbackIntegrationTests" test` passed; full `.\mvnw.cmd clean verify` passed with 118 backend tests and JaCoCo line 85.11% / branch 60.78%.
+
+## P-031 AI Output Examples
+
+### Accepted
+
+The Render Static Site runtime-config writer, documented SPA rewrite, static security-header plan, release checklist, and live-vs-target architecture diagrams were accepted because they improve deployment reproducibility without changing backend business behavior or committing secrets.
+
+### Edited
+
+The deployment evidence was edited to avoid claiming live frontend cookie/CSRF validation before a frontend URL exists. The CI audit threshold was also kept at high severity so known moderate Angular CLI development-chain findings remain visible in documentation without blocking every CI run.
+
+### Rejected
+
+Changing refresh-cookie SameSite policy, loosening CSRF, switching Angular to hash routing, embedding Angular into Spring Boot, adding frontend telemetry SDKs, and adding backend migrations were rejected because Stage 9D is deployment compatibility and evidence only.

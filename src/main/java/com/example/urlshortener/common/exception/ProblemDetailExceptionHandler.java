@@ -2,6 +2,7 @@ package com.example.urlshortener.common.exception;
 
 import com.example.urlshortener.common.correlation.CorrelationIdFilter;
 import com.example.urlshortener.common.ratelimit.RateLimitExceededException;
+import com.example.urlshortener.idempotency.service.IdempotencyConflictException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +57,36 @@ public class ProblemDetailExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(detail);
     }
 
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ResponseEntity<ProblemDetail> handleIdempotencyConflict(IdempotencyConflictException ex, WebRequest request) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        detail.setTitle("Conflict");
+        detail.setType(URI.create("https://example.com/problem/idempotency-conflict"));
+        detail.setProperty("errorCode", "idempotency_conflict");
+        detail.setProperty("correlationId", correlationId(request));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(detail);
+    }
+
+    @ExceptionHandler(PreconditionRequiredException.class)
+    public ResponseEntity<ProblemDetail> handlePreconditionRequired(PreconditionRequiredException ex, WebRequest request) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.PRECONDITION_REQUIRED, ex.getMessage());
+        detail.setTitle("Precondition Required");
+        detail.setType(URI.create("https://example.com/problem/precondition-required"));
+        detail.setProperty("errorCode", "precondition_required");
+        detail.setProperty("correlationId", correlationId(request));
+        return ResponseEntity.status(HttpStatus.PRECONDITION_REQUIRED).body(detail);
+    }
+
+    @ExceptionHandler(PreconditionFailedException.class)
+    public ResponseEntity<ProblemDetail> handlePreconditionFailed(PreconditionFailedException ex, WebRequest request) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.PRECONDITION_FAILED, ex.getMessage());
+        detail.setTitle("Precondition Failed");
+        detail.setType(URI.create("https://example.com/problem/precondition-failed"));
+        detail.setProperty("errorCode", "precondition_failed");
+        detail.setProperty("correlationId", correlationId(request));
+        return ResponseEntity.status(HttpStatus.PRECONDITION_FAILED).body(detail);
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ProblemDetail> handleConstraintViolation(ConstraintViolationException ex, WebRequest request) {
         String violations = ex.getConstraintViolations().stream()
@@ -95,6 +126,16 @@ public class ProblemDetailExceptionHandler {
         detail.setTitle("Quota exceeded");
         detail.setType(URI.create("https://example.com/problem/quota-exceeded"));
         detail.setProperty("errorCode", ex.code());
+        detail.setProperty("correlationId", correlationId(request));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(detail);
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ProblemDetail> handleForbidden(ForbiddenException ex, WebRequest request) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        detail.setTitle("Forbidden");
+        detail.setType(URI.create("https://example.com/problem/forbidden"));
+        detail.setProperty("errorCode", "forbidden");
         detail.setProperty("correlationId", correlationId(request));
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(detail);
     }

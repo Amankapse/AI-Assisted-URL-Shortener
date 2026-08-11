@@ -35,7 +35,28 @@ Check Render logs for:
 
 - active `prod` profile;
 - successful Neon PostgreSQL connection;
-- Flyway validating and applying migrations `V1` through `V4`;
+- Flyway validating and applying migrations `V1` through `V10`;
 - Hibernate schema validation success;
 - successful Redis/Valkey connection or documented Redis degradation metrics if unavailable.
 
+## Frontend Checks
+
+For the Render Static Site:
+
+- direct navigation to `/app/urls` returns Angular through the SPA rewrite;
+- direct navigation to `/app/audit`, `/app/api-keys`, and `/app/admin/outbox` returns Angular rather than a CDN 404;
+- `app-config.json` contains only public values: `apiBaseUrl`, `publicShortUrlBase`, and `environment`;
+- `apiBaseUrl` points to the public backend origin, not an internal Render URL;
+- static security/cache headers match [frontend-render.md](frontend-render.md).
+
+## Cookie And CSRF Checks
+
+Validate in a browser:
+
+- login sets the backend refresh cookie;
+- hard reload attempts refresh and restores authenticated state;
+- logout sends `X-XSRF-TOKEN` and succeeds;
+- invalid/missing CSRF for refresh/logout is rejected;
+- CORS response allows the exact frontend origin and credentials.
+
+If `SameSite=Strict` prevents cross-subdomain refresh cookies from being sent between the frontend static site and backend service, stop and review the domain strategy. Do not switch to `SameSite=None` without explicit security approval.

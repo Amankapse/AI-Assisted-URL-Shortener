@@ -1,0 +1,22 @@
+<section class="panel">
+  <p class="eyebrow">Platform</p>
+  <h1>Moderation</h1>
+  <p class="muted">Blocking makes the public redirect unavailable. Backend mutation and cache invalidation remain authoritative.</p>
+  @if (problem(); as currentProblem) { <app-error-state [problem]="currentProblem" /> }
+  <form [formGroup]="form">
+    <label>URL ID <input formControlName="urlId" placeholder="00000000-0000-0000-0000-000000000000" /></label>
+    <div class="actions">
+      <button type="button" class="danger" (click)="request('block')" [disabled]="saving()">Block URL</button>
+      <button type="button" (click)="request('unblock')" [disabled]="saving()">Unblock URL</button>
+    </div>
+  </form>
+</section>
+
+<app-confirm-dialog
+  [open]="!!action()"
+  [title]="action() === 'block' ? 'Block URL' : 'Unblock URL'"
+  [description]="action() === 'block' ? 'Blocking makes the public redirect unavailable.' : 'Unblocking allows the public redirect to resolve again when the URL is otherwise active.'"
+  [confirmLabel]="action() === 'block' ? 'Block' : 'Unblock'"
+  (confirmed)="confirm()"
+  (cancelled)="action.set(null)"
+/>

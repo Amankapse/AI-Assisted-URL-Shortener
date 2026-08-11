@@ -8,14 +8,23 @@ This repository contains a production-oriented URL shortener implemented with Ja
 
 - User registration and login
 - `USER` and `ADMIN` authorization
+- Workspace tenant foundation with workspace RBAC
+- Immutable application-level audit trail for enterprise mutations
+- Workspace-bound machine API keys with scoped access
+- Transactional outbox for durable URL mutation, cache invalidation, and optional analytics delivery
+- Workspace campaigns, normalized tags, and bounded URL search/filtering
 - RS256 JWT access tokens
 - Rotating opaque refresh tokens stored only as SHA-256 digests
 - Refresh-token reuse detection and token-family revocation
 - CSRF protection for refresh/logout cookie flows
 - URL creation with optional custom aliases
+- Derived full short URL responses
+- Optional idempotent URL creation with `Idempotency-Key`
+- Destination editing with ETag / `If-Match` lost-update protection
 - Expiration, enable/disable, and soft deletion
 - Administrative URL blocking for abuse moderation
 - Owner-scoped URL management without client-supplied owner IDs
+- Workspace-scoped URL management through optional `X-Workspace-ID`
 - Public redirect endpoint
 - Redis cache-aside redirect lookup
 - After-commit cache invalidation
@@ -34,6 +43,7 @@ This repository contains a production-oriented URL shortener implemented with Ja
 - GitHub Actions CI workflow
 - JaCoCo coverage reporting
 - k6 performance scripts
+- Angular 22 frontend with runtime config, auth, workspace shell, link management, analytics, audit, API keys, workspace management, and platform operations
 
 ## Technology Stack
 
@@ -54,6 +64,8 @@ This repository contains a production-oriented URL shortener implemented with Ja
 | Mockito | 5.17.0 via Spring Boot test |
 | Testcontainers | 1.21.0 via Spring Boot dependency management |
 | Docker | Docker Desktop/Engine required; local validation used Docker server 29.6.1 |
+| Frontend | Angular 22.1.3, TypeScript 6.0.2, RxJS 7.8, Angular CLI build/test tooling |
+| Node/npm | Local validation used Node 24.18.0 and npm 11.16.0 |
 | GitHub Actions | `.github/workflows/ci.yml` |
 | JaCoCo | 0.8.12 Maven plugin |
 | k6 | Scripts in `performance/k6/`; local execution was not performed because k6 was unavailable |
@@ -62,26 +74,39 @@ This repository contains a production-oriented URL shortener implemented with Ja
 
 ```mermaid
 flowchart TB
-    Client[Client / Browser / API Consumer] --> App[Spring Boot Modular Monolith]
-    App --> Security[Security: JWT, CSRF, CORS, Ownership]
+    Browser[Angular SPA / Browser] --> App[Spring Boot Modular Monolith]
+    Client[API Consumer] --> App
+    App --> Security[Security: JWT, API Keys, CSRF, CORS, Workspace RBAC]
     App --> Auth[Auth Module]
+    App --> Workspaces[Workspace/Tenant Module]
+    App --> Audit[Audit Trail Module]
+    App --> ApiKeys[API Key Module]
+    App --> Outbox[Transactional Outbox]
     App --> Urls[URL Management]
     App --> Redirect[Redirect Module]
     App --> Analytics[Analytics Module]
     App --> RateLimit[Redis Lua Rate Limiting]
     App --> Observability[Actuator + Micrometer + Correlation IDs]
     Auth --> Postgres[(PostgreSQL)]
+    Workspaces --> Postgres
+    ApiKeys --> Postgres
     Urls --> Postgres
     Redirect --> Redis[(Redis)]
     Redirect --> Postgres
     Analytics --> Postgres
+    Audit --> Postgres
+    Outbox --> Postgres
+    Outbox --> Redis
     RateLimit --> Redis
     Observability --> Metrics[Operational Metrics]
+    Browser --> RuntimeConfig[Runtime app-config.json]
 ```
 
-The application is a modular monolith to keep feature boundaries clear without adding distributed-system complexity. PostgreSQL is the source of truth for users, URLs, refresh-token digests, and analytics. Redis is an optimization for redirect cache-aside and rate limiting; redirect correctness falls back to PostgreSQL when Redis is unavailable. Analytics are asynchronous and best-effort so redirect latency remains protected. Ownership is derived from the authenticated JWT subject and enforced in services/repositories.
+The application is a modular monolith to keep feature boundaries clear without adding distributed-system complexity. PostgreSQL is the source of truth for users, workspaces, memberships, URLs, refresh-token digests, API-key digests, analytics, and audit events. Redis is an optimization for redirect cache-aside and rate limiting; redirect correctness falls back to PostgreSQL when Redis is unavailable. Analytics are asynchronous and best-effort so redirect latency remains protected. Audit writes are synchronous in the same database transaction as the business mutation where practical. Tenant access is derived from workspace membership for humans and workspace-bound API-key scopes for machines.
 
-Detailed architecture is in [docs/architecture/architecture-overview.md](docs/architecture/architecture-overview.md).
+Detailed architecture is in [docs/architecture/architecture-overview.md](docs/architecture/architecture-overview.md) and [docs/architecture/transactional-outbox.md](docs/architecture/transactional-outbox.md).
+
+The Angular frontend is independently deployable and implements authenticated link management plus enterprise operations: runtime configuration, login/register, memory-only access-token state, refresh single-flight, CSRF propagation, workspace context propagation, guards, interceptors, URL dashboard, create flow, ETag-aware URL details editing, campaign management, URL analytics, audit trails, API-key lifecycle management, workspace/member management, platform analytics, moderation, admin audit, read-only outbox visibility, and Render Static Site deployment hardening. QR-code, custom-domain, and tracing UI work remain out of scope. See [docs/frontend/architecture.md](docs/frontend/architecture.md).
 
 # Prerequisites
 
@@ -93,6 +118,7 @@ Docker must be running because integration tests start PostgreSQL and Redis thro
 | Java 21 JDK | `java -version` |
 | Docker Desktop / Docker Engine | `docker --version` |
 | Docker Compose | `docker compose version` |
+| Node.js 24 and npm 11 | `node -v` and `npm -v`; required for the Angular frontend |
 | Maven | Maven wrapper is included; separate Maven install is not required |
 | PowerShell | Required for Windows commands |
 | Bash | Required for Unix/macOS commands and `scripts/verify.sh` |
@@ -107,6 +133,7 @@ Use [.env.example](.env.example) as a variable-name template only. Do not commit
 | Variable | Required | Purpose | Example |
 | --- | --- | --- | --- |
 | `SPRING_PROFILES_ACTIVE` | Local recommended | Activate local profile | `local` |
+| `APP_PUBLIC_BASE_URL` | Yes for deployed environments | Base URL used to derive `shortUrl` responses | `https://<service>.onrender.com` |
 | `SPRING_DATASOURCE_URL` | Yes | PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/shortener` |
 | `SPRING_DATASOURCE_USERNAME` | Yes | Database username | `shortener` |
 | `SPRING_DATASOURCE_PASSWORD` | Yes | Database password | `<database-password>` |
@@ -130,6 +157,7 @@ Use [.env.example](.env.example) as a variable-name template only. Do not commit
 | `APP_REDIRECT_CACHE_JITTER` | No | Cache TTL jitter | `30s` |
 | `APP_REDIRECT_CACHE_SINGLE_FLIGHT_TIMEOUT` | No | Single-flight wait timeout | `2s` |
 | `APP_REDIRECT_CACHE_SINGLE_FLIGHT_CAPACITY` | No | Single-flight in-flight key capacity | `1024` |
+| `APP_ANALYTICS_PUBLISHER` | No | Analytics delivery mode: `local` or `outbox`; defaults to `local` | `local` |
 | `APP_ANALYTICS_IP_HASH_PEPPER` | Yes for production | HMAC pepper for IP anonymization | `<analytics-hmac-pepper-from-secret-manager>` |
 | `APP_ANALYTICS_QUEUE_CAPACITY` | No | Analytics queue capacity | `1000` |
 | `APP_ANALYTICS_BATCH_SIZE` | No | Analytics batch size | `100` |
@@ -138,6 +166,16 @@ Use [.env.example](.env.example) as a variable-name template only. Do not commit
 | `APP_ANALYTICS_SHUTDOWN_FLUSH_TIMEOUT` | No | Shutdown flush timeout | `5s` |
 | `APP_ANALYTICS_RETRY_COUNT` | No | Batch persistence retry count | `2` |
 | `APP_ANALYTICS_TOP_LINKS_MAX` | No | Max admin top-links limit | `25` |
+| `APP_IDEMPOTENCY_RETENTION` | No | Retention period for completed idempotency records | `24h` |
+| `APP_IDEMPOTENCY_CLEANUP_INTERVAL` | No | Cleanup interval for expired idempotency records | `1h` |
+| `APP_AUDIT_METADATA_MAX_BYTES` | No | Maximum serialized safe audit metadata size | `4096` |
+| `APP_AUDIT_RETENTION` | No | Documented audit retention horizon; no destructive purge job is implemented | `3650d` |
+| `APP_OUTBOX_ENABLED` | No | Enable transactional outbox dispatcher | `true` |
+| `APP_OUTBOX_BATCH_SIZE` | No | Dispatcher claim batch size | `25` |
+| `APP_OUTBOX_WORKERS` | No | Dispatcher worker count | `1` |
+| `APP_OUTBOX_CLAIM_TIMEOUT` | No | Stale processing claim recovery window | `5m` |
+| `APP_OUTBOX_MAX_ATTEMPTS` | No | Retry attempts before `DEAD` | `5` |
+| `APP_OUTBOX_MAX_PAYLOAD_BYTES` | No | Maximum serialized outbox payload size | `8192` |
 | `APP_RATE_LIMIT_ENABLED` | No | Rate-limit toggle | `true` |
 | `APP_RATE_LIMIT_KEY_SALT` | Yes for production | Salt for hashed rate-limit keys | `<rate-limit-key-salt-from-secret-manager>` |
 | `APP_RATE_LIMIT_REDIS_TIMEOUT` | No | Rate-limit Redis timeout setting | `250ms` |
@@ -264,6 +302,16 @@ Invoke-RestMethod http://localhost:8080/actuator/health/readiness
 http://localhost:8080/swagger-ui.html
 ```
 
+8. Start the Angular frontend in another terminal:
+
+```powershell
+cd frontend
+npm ci
+npm start
+```
+
+The default frontend runtime config points at `http://localhost:8080`.
+
 ## Unix/macOS
 
 ```bash
@@ -293,6 +341,14 @@ export APP_AUTH_SECURE_COOKIES=false
 export APP_ANALYTICS_IP_HASH_PEPPER=local-development-only-change-me
 export APP_RATE_LIMIT_KEY_SALT=local-development-rate-limit-salt
 ./mvnw spring-boot:run
+```
+
+In another terminal:
+
+```bash
+cd frontend
+npm ci
+npm start
 ```
 
 ## Docker Startup
@@ -415,6 +471,12 @@ Flyway runs automatically on application startup. PostgreSQL is authoritative an
 | `V2__authentication_refresh_tokens.sql` | Refresh-token table, token digest uniqueness, family/user indexes |
 | `V3__click_analytics_indexes.sql` | Click analytics correlation ID, soft-delete support, analytics indexes |
 | `V4__url_moderation_and_hyperscale_controls.sql` | Administrative blocked state and supporting index |
+| `V5__idempotency_keys.sql` | Idempotency records for safe URL create retries |
+| `V6__workspaces_and_memberships.sql` | Workspace tenancy, memberships, and workspace-scoped URL indexes |
+| `V7__audit_events.sql` | Immutable application-level audit events with bounded JSONB metadata |
+| `V8__api_keys.sql` | Workspace-bound API keys and API-key audit actions |
+| `V9__outbox_events.sql` | Transactional outbox events, claim/retry fields, and dispatch indexes |
+| `V10__campaigns_tags_and_search.sql` | Campaigns, tags, URL tag assignments, nullable campaign assignment, destination host search support, and audit enum expansion |
 
 Migration files are in `src/main/resources/db/migration/`.
 
@@ -471,14 +533,33 @@ Unix/macOS:
 ./mvnw clean verify
 ```
 
-The verified suite contains 84 tests. The build starts PostgreSQL and Redis Testcontainers automatically, runs Flyway migrations, validates Hibernate schema mappings, executes unit/integration/security/operation tests, builds the jar, and generates JaCoCo coverage.
+The verified backend suite count is recorded in [docs/testing/test-strategy.md](docs/testing/test-strategy.md). The backend build starts PostgreSQL and Redis Testcontainers automatically, runs Flyway migrations, validates Hibernate schema mappings, executes unit/integration/security/operation tests, builds the jar, and generates JaCoCo coverage.
+
+Frontend:
+
+```powershell
+cd frontend
+npm test -- --watch=false
+npm run build
+```
+
+Stage 9C frontend validation currently has 21 passing Angular unit tests.
+
+Render Static Site frontend settings:
+
+```text
+Root Directory: frontend
+Build Command: npm ci && npm run build:render
+Publish Directory: dist/frontend/browser
+Rewrite: /* -> /index.html
+```
 
 # Coverage
 
 Current JaCoCo results:
 
-- Line coverage: 84.44%
-- Branch coverage: 65.41%
+- Line coverage: 85.11%
+- Branch coverage: 60.78%
 - Report: `target/site/jacoco/index.html`
 
 Coverage is quality evidence, not proof of correctness. See [docs/testing/coverage-summary.md](docs/testing/coverage-summary.md).
@@ -490,6 +571,10 @@ k6 scripts are provided in `performance/k6/`:
 - `redirect-cache-hit.js`
 - `redirect-cache-miss.js`
 - `url-create.js`
+- `url-list.js`
+- `url-search.js`
+- `campaign-filter.js`
+- `tag-filter.js`
 - `login.js`
 - `user-analytics.js`
 - `admin-analytics.js`
@@ -517,6 +602,9 @@ The workflow:
 - generates JaCoCo coverage
 - uploads test and coverage artifacts
 - validates Docker Compose configuration
+- configures Node.js 24
+- runs `npm ci`, `npm run build`, and `npm test -- --watch=false` in `frontend/`
+- uploads the Angular production build artifact
 
 Remote CI status is not claimed until the workflow runs on GitHub after push.
 
@@ -531,6 +619,7 @@ Implemented observability includes:
 - liveness excluding PostgreSQL and Redis
 - readiness requiring PostgreSQL and excluding Redis
 - Redis cache/single-flight metrics
+- transactional outbox backlog, retry/dead-letter, dispatch, and handler metrics
 - authentication metrics
 - analytics queue/event/batch metrics
 - rate-limit accepted/rejected/failure metrics
@@ -546,17 +635,21 @@ Security controls include:
 - `kid` emitted in the JOSE header
 - opaque refresh tokens stored as SHA-256 digests
 - refresh-token rotation and reuse detection
+- workspace-bound API keys stored as HMAC-SHA-256 digests and accepted only through `X-API-Key`
 - CSRF protection for refresh/logout cookie flows
 - explicit CORS allowlist
 - deny-by-default authorization
-- ownership and IDOR protection through JWT subject and repository/service scope
+- workspace RBAC and IDOR protection through membership checks plus `workspace_id` repository/service scope
+- immutable application-level audit events for URL, workspace, membership, and moderation mutations
+- transactional outbox rows for durable URL mutation/cache invalidation events with bounded payloads
+- API-key create/revoke audit events and API-key actor attribution on machine URL mutations
 - Redis rate limiting
 - HMAC analytics IP anonymization
 - secure headers
 - no sensitive Actuator endpoint exposure
 - production secret values expected from environment/secret management
 
-See [docs/security/authentication.md](docs/security/authentication.md) and [docs/security/threat-model.md](docs/security/threat-model.md).
+See [docs/security/authentication.md](docs/security/authentication.md), [docs/security/api-keys.md](docs/security/api-keys.md), and [docs/security/threat-model.md](docs/security/threat-model.md).
 
 # Failure And Degradation Behavior
 
@@ -565,21 +658,25 @@ See [docs/security/authentication.md](docs/security/authentication.md) and [docs
 | Redis cache unavailable | Redirect resolution falls back to PostgreSQL |
 | Redis rate limiter unavailable | Endpoint-specific fail-open/fail-closed policy applies |
 | PostgreSQL unavailable | Readiness reports DOWN; PostgreSQL-backed reads/writes fail safely |
+| API key revoked/expired/invalid | Generic HTTP 401 Problem Details; raw key material is not logged |
+| Outbox handler transient failure | Event retries with backoff until processed or moved to `DEAD` |
 | Analytics queue full | Redirect succeeds; analytics event may be dropped |
 | Refresh-token reuse | Token family is revoked and login is required |
 | Invalid JWT | HTTP 401 Problem Details |
-| Unauthorized ownership | Owner-scoped APIs return not-found for inaccessible resources; admin-only APIs return 403 for non-admin users |
+| Unauthorized workspace access | Workspace-scoped APIs return not-found or forbidden based on the operation; admin-only APIs return 403 for non-admin users |
 
 # Known Limitations
 
 - Analytics queue is best-effort and can drop events under overload.
 - No durable Kafka/event broker.
+- Transactional outbox provides durable database-backed delivery, but no external broker is implemented.
 - Single-flight protection is JVM-local.
 - No distributed single-flight or distributed lock.
 - No external secret manager integration in the prototype.
 - No Kubernetes deployment manifests.
 - No multi-region architecture.
 - Hyperscale distributed stores, CDN/edge, WAF, Redis Cluster, durable event streaming, OLAP warehouse, and multi-region infrastructure are documented but not implemented locally.
+- Audit immutability is enforced by application behavior and append-only migration design, not by cryptographic chaining or WORM storage.
 - k6 scripts exist, but local load results were not measured because k6 was unavailable.
 - Remote CI status is pending until the branch is pushed and the workflow runs on GitHub.
 - No public admin provisioning flow is implemented.
@@ -616,8 +713,12 @@ src/
     java/          Spring Boot application modules
     resources/     application config and Flyway migrations
   test/            unit, integration, security, and operation tests
+frontend/
+  src/app/         Angular 22 frontend auth, link management, and operations UI
+  public/          runtime app-config.json
 docs/
   architecture/    architecture overview, diagrams, ADRs
+  frontend/        Angular architecture, auth, config, deployment, security, testing, flows
   security/        authentication notes and threat model
   testing/         test strategy, coverage, performance, quality review
   operations/      runbook and rollback guide
@@ -642,6 +743,7 @@ performance/
 | [Redirect sequence](docs/architecture/sequence-redirect.md) | Redirect/cache/analytics flow |
 | [Authentication sequence](docs/architecture/sequence-authentication.md) | Auth flow |
 | [Observability](docs/architecture/observability.md) | Metrics, Actuator, correlation IDs |
+| [Transactional outbox](docs/architecture/transactional-outbox.md) | Durable event delivery design |
 | [Rate limiting](docs/architecture/rate-limiting.md) | Redis Lua limiter design |
 | [ADR-001 Modular monolith](docs/architecture/adr/ADR-001-modular-monolith.md) | Architecture decision |
 | [ADR-002 PostgreSQL source of truth](docs/architecture/adr/ADR-002-postgresql-source-of-truth.md) | Persistence decision |
@@ -654,6 +756,7 @@ performance/
 | Document | Purpose |
 | --- | --- |
 | [Authentication and ownership](docs/security/authentication.md) | JWT, refresh, CSRF, ownership |
+| [API key security](docs/security/api-keys.md) | Machine credentials, storage, scopes, rotation |
 | [Threat model](docs/security/threat-model.md) | Threats, mitigations, residual risk |
 | [Security ADR](docs/architecture/adr/ADR-004-security-model.md) | Security architecture decision |
 
@@ -682,6 +785,18 @@ performance/
 | [Rollback guide](docs/operations/rollback.md) | Rollback policy |
 | [Observability](docs/architecture/observability.md) | Health/readiness/metrics |
 | [Rate limiting](docs/architecture/rate-limiting.md) | Limiter policies and failure behavior |
+
+## Frontend
+
+| Document | Purpose |
+| --- | --- |
+| [Frontend architecture](docs/frontend/architecture.md) | Angular module boundaries and Stage 9C scope |
+| [Frontend authentication](docs/frontend/authentication.md) | Memory-only access tokens, refresh, CSRF |
+| [Runtime configuration](docs/frontend/runtime-configuration.md) | `app-config.json` contract |
+| [Frontend deployment](docs/frontend/deployment.md) | Static hosting guidance |
+| [Frontend security](docs/frontend/security.md) | Browser security controls and CSP |
+| [Frontend testing](docs/frontend/testing.md) | Angular test coverage |
+| [User flows](docs/frontend/user-flows.md) | Auth, link-management, and operations flows |
 
 ## AI-Assisted Engineering
 

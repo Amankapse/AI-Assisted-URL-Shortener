@@ -8,11 +8,11 @@ The original URL-shortener requirement was normalized into phased, testable requ
 
 The application uses a modular monolith because the assessment benefits from clear package boundaries without distributed-system overhead. The modules are organized around auth, user, URL, redirect, analytics, security, common infrastructure, and configuration.
 
-PostgreSQL is the source of truth for users, URLs, refresh-token digests, and analytics. Flyway owns schema evolution and Hibernate validates mappings against the migrated schema.
+PostgreSQL is the source of truth for users, workspaces, memberships, URLs, refresh-token digests, API-key digests, analytics, idempotency records, and audit events. Flyway owns schema evolution and Hibernate validates mappings against the migrated schema.
 
 Redis is used only as an optimization for redirect cache-aside and distributed rate limiting. Redirect correctness remains PostgreSQL-backed, and Redis health does not make the service unready.
 
-Spring Security was chosen over a custom authentication filter so JWT validation, CSRF, CORS, authorization, and security headers rely on maintained framework mechanisms. Access tokens are RS256 JWTs; refresh tokens are opaque, rotated, stored as SHA-256 digests, and protected by CSRF when transported by cookie.
+Spring Security was chosen for JWT validation, CSRF, CORS, authorization, and security headers. Access tokens are RS256 JWTs; refresh tokens are opaque, rotated, stored as SHA-256 digests, and protected by CSRF when transported by cookie. Workspace-bound API keys extend authentication for machine clients while keeping human session behavior unchanged.
 
 Analytics are asynchronous and bounded so public redirect latency is protected. This deliberately trades perfect analytics completeness for service availability under pressure.
 
@@ -36,6 +36,12 @@ Phase 5 added observability, rate limiting, correlation IDs, health behavior, an
 
 The hyperscale evolution added short-code namespace headroom, collision metrics, quota checks, and moderation blocking while keeping the existing public user URL APIs backward compatible. Existing 7-character short codes still resolve; new generated codes default to 8 characters.
 
+The enterprise audit evolution added append-only application-level audit events for URL, workspace, membership, and moderation mutations. Audit events are written synchronously in the same PostgreSQL transaction as the mutation where practical. Metadata is allowlisted and bounded; destination changes store host and SHA-256 hashes instead of raw URLs.
+
+Stage 6 added machine-to-machine API keys as a brownfield security extension. The change added V8 `api_keys`, one-time raw key return, HMAC-SHA-256 digest storage, workspace-bound scopes, API-key rate limiting, API-key create/revoke audit events, and service-layer actor attribution without changing human JWT/refresh-token behavior.
+
+Stage 7 added transactional outbox delivery as a brownfield durability extension. The change added V9 `outbox_events`, same-transaction URL mutation events, durable cache invalidation work, opt-in outbox analytics publishing, bounded PostgreSQL `SKIP LOCKED` dispatch, retry/dead-letter handling, low-cardinality metrics, and read-only platform-admin inspection without adding a broker or changing the redirect cache-aside architecture.
+
 ## Ambiguous Scenario
 
 "Make it enterprise ready" was treated as an ambiguous request and converted into concrete acceptance criteria:
@@ -44,6 +50,7 @@ The hyperscale evolution added short-code namespace headroom, collision metrics,
 - JWT and refresh-token validation
 - CSRF rationale
 - owner enforcement without client owner IDs
+- machine credentials constrained to workspace scopes
 - Redis as optional optimization
 - bounded queues and timeouts
 - rate limiting with explicit failure modes
@@ -73,6 +80,9 @@ Edited examples:
 - Flyway validation was corrected by adding `flyway-database-postgresql` after identifying that PostgreSQL support is separated from Flyway core.
 - URL creation metrics were adjusted to avoid double-counting custom alias conflicts.
 - Hyperscale output was edited to keep only safe local changes in code while documenting CDN, WAF, Kafka/Kinesis/Pulsar, Redis Cluster, and distributed KV stores as future architecture.
+- Audit query implementation was edited from nullable JPQL parameters to dynamic JPA specifications after PostgreSQL rejected ambiguous null timestamp parameters during Testcontainers validation.
+- API-key output was edited to avoid delimiter ambiguity in generated key parsing, to disable servlet auto-registration of the security filter, and to return RFC7807 429 responses from the filter path when the API-key limiter rejects.
+- Outbox test output was edited to use the application UTC `Clock` rather than machine-local time so dispatcher scheduling semantics are tested accurately.
 
 Rejected examples:
 
@@ -89,10 +99,14 @@ The implementation chose simpler, safer approaches where appropriate:
 
 - Modular monolith instead of microservices to avoid unnecessary distributed complexity.
 - No Kafka or durable broker in the prototype; analytics are best-effort and bounded.
+- Transactional outbox gives durable database-backed delivery for control-plane events, but it is not represented as an external event-streaming platform.
 - PostgreSQL is authoritative; Redis failures degrade performance, not correctness.
 - Single-flight is in-process and documented rather than pretending to solve cross-node stampedes.
 - Security is deny-by-default, with explicit public endpoints and explicit admin endpoints.
 - Metrics avoid user IDs, URL IDs, short codes, emails, IP addresses, token IDs, and exception messages as tags.
+- Audit metadata avoids passwords, tokens, cookies, raw destination URLs, raw IP addresses, and unbounded JSON; audit rows are append-only through application behavior.
+- API-key storage uses one-way HMAC digests and never stores raw keys; API keys do not receive `ROLE_ADMIN` and cannot manage workspaces or other API keys.
+- Outbox payloads are bounded DTOs, not JPA entities or secrets; admin inspection omits raw payload JSON.
 - The shortcode default moved to 8-character random Base62 rather than sequential public IDs, MD5 truncation, or Hashids-as-security.
 - Moderation is represented as `blocked` alongside existing enabled/deleted/expiration state rather than replacing lifecycle with a broad enum migration.
 
@@ -105,7 +119,7 @@ Final release validation includes:
 - `docker compose config`
 - PostgreSQL Testcontainers
 - Redis Testcontainers
-- Flyway V1, V2, V3, V4 validation and application
+- Flyway V1 through V10 validation and application
 - Hibernate schema validation
 - JaCoCo coverage report generation
 - GitHub Actions workflow definition
@@ -113,15 +127,18 @@ Final release validation includes:
 
 Final local results:
 
-- Tests: 84 passing
-- Line coverage: 84.44%
-- Branch coverage: 65.41%
+- Backend tests: 118 passing
+- Frontend tests: 21 passing
+- Line coverage: 85.11%
+- Branch coverage: 60.78%
 - Docker: PostgreSQL and Redis Testcontainers started successfully
-- Migrations: Flyway V1, V2, V3, and V4 validated and applied
+- Migrations: Flyway V1 through V10 validated and applied
 - Schema: Hibernate validation succeeded
 - Compose: `docker compose config` passed without warnings
+- Frontend build: Angular production build passed with 103.64 kB raw / 26.71 kB estimated transfer initial bundle
+- Render frontend build: `npm run build:render` generated public `app-config.json`
 
-The local environment did not have k6 installed, so no measured performance results are claimed. The GitHub Actions workflow is defined but must be verified remotely after the branch is pushed.
+The local environment did not have k6 installed, so no measured performance results are claimed. The GitHub Actions workflow is defined but must be verified remotely after the branch is pushed. Live frontend cookie/CSRF/reload smoke validation must be completed after a frontend Render Static Site URL is available.
 
 ## Risks And Trade-Offs
 
@@ -129,12 +146,15 @@ Known limitations:
 
 - Analytics are best-effort and can drop events under overload.
 - No durable event broker.
+- Transactional outbox is at-least-once and database-backed; it is not an exactly-once broker.
 - No distributed single-flight.
 - No external secret manager integration.
 - No Kubernetes, autoscaling, or multi-AZ deployment manifests.
 - Registration duplicate behavior can reveal that an email already exists.
 - CI workflow must be verified remotely after the branch is pushed.
 - Local load testing was not executed because k6 was unavailable.
+- Audit immutability is application-level only; cryptographic chaining and WORM storage are not implemented.
+- API keys are bearer credentials; stolen raw keys remain usable until expiration or revocation, and pepper rotation requires coordinated key reissue.
 - The local implementation does not include CDN/edge routing, WAF, Redis Cluster, distributed URL storage, Kafka/Kinesis/Pulsar, OLAP analytics warehouse, or multi-region infrastructure.
 
 ## Production Evolution

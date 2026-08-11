@@ -47,7 +47,7 @@ class ClickAnalyticsServiceTests {
         ClickAnalyticsWriter writer = mock(ClickAnalyticsWriter.class);
         AnalyticsCounters counters = new AnalyticsCounters();
         AppMetrics metrics = mock(AppMetrics.class);
-        ClickAnalyticsPublisher publisher = new ClickAnalyticsPublisher(
+        LocalQueueClickEventPublisher publisher = new LocalQueueClickEventPublisher(
                 properties,
                 sanitizer,
                 writer,

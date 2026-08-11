@@ -1,0 +1,192 @@
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Workspace links</p>
+    <h1>Links</h1>
+  </div>
+  <a class="primary-action" routerLink="/app/urls/new">Create link</a>
+</section>
+
+<form [formGroup]="filters" class="filters" aria-label="Link filters">
+  <label>
+    Search
+    <input formControlName="q" placeholder="Short code, alias, destination" />
+  </label>
+  <label>
+    State
+    <select formControlName="state">
+      <option value="">Any state</option>
+      <option value="ACTIVE">Active</option>
+      <option value="DISABLED">Disabled</option>
+      <option value="BLOCKED">Blocked</option>
+      <option value="EXPIRED">Expired</option>
+    </select>
+  </label>
+  <label>
+    Campaign
+    <select formControlName="campaignId">
+      <option value="">Any campaign</option>
+      @for (campaign of campaigns(); track campaign.id) {
+        <option [value]="campaign.id">{{ campaign.name }}</option>
+      }
+    </select>
+  </label>
+  <label>
+    Tag
+    <select formControlName="tag">
+      <option value="">Any tag</option>
+      @for (tag of tags(); track tag.id) {
+        <option [value]="tag.name">{{ tag.name }}</option>
+      }
+    </select>
+  </label>
+  <label>
+    Created from
+    <input type="datetime-local" formControlName="createdFrom" />
+  </label>
+  <label>
+    Created to
+    <input type="datetime-local" formControlName="createdTo" />
+  </label>
+  <label>
+    Expires after
+    <input type="datetime-local" formControlName="expiresAfter" />
+  </label>
+  <label>
+    Expires before
+    <input type="datetime-local" formControlName="expiresBefore" />
+  </label>
+  <label>
+    Alias
+    <select formControlName="customAlias">
+      <option value="">Any</option>
+      <option value="true">Custom alias</option>
+      <option value="false">Generated</option>
+    </select>
+  </label>
+  <label>
+    Sort
+    <select formControlName="sort">
+      @for (sort of sortOptions; track sort) {
+        <option [value]="sort">{{ sort }}</option>
+      }
+    </select>
+  </label>
+  <button type="button" class="secondary-action" (click)="clearFilters()">Clear</button>
+</form>
+
+@if (problem(); as currentProblem) {
+  <app-error-state [problem]="currentProblem" />
+}
+
+@if (loading()) {
+  <p class="loading">Loading links...</p>
+} @else if (page(); as results) {
+  @if (results.empty) {
+    <app-empty-state title="No links found" detail="Create a link or adjust the filters." />
+  } @else {
+    <div class="desktop-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Short link</th>
+            <th>Destination</th>
+            <th>Campaign</th>
+            <th>Tags</th>
+            <th>State</th>
+            <th>Clicks</th>
+            <th>Timing</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (link of results.content; track link.id) {
+            <tr>
+              <td>
+                <a [routerLink]="['/app/urls', link.id]">{{ link.shortCode }}</a>
+                <small>{{ link.shortUrl }}</small>
+              </td>
+              <td>{{ host(link.originalUrl) }}</td>
+              <td>{{ link.campaign?.name ?? 'None' }}</td>
+              <td>
+                <div class="tags">
+                  @for (tag of link.tags; track tag) {
+                    <app-tag-chip [tag]="tag" />
+                  }
+                </div>
+              </td>
+              <td><app-status-badge [state]="link.state" /></td>
+              <td>{{ link.clickCount }}</td>
+              <td>
+                <small>Created {{ link.createdAt | date:'medium' }}</small>
+                <small>Expires {{ link.expiresAt | date:'medium' }}</small>
+              </td>
+              <td>
+                <div class="row-actions">
+                  <app-copy-button [value]="link.shortUrl" label="Copy" />
+                  <a class="icon-action" [href]="link.shortUrl" target="_blank" rel="noreferrer">Open</a>
+                  @if (ownerActionsAllowed(link)) {
+                    @if (link.enabled) {
+                      <button type="button" (click)="disable(link)" [disabled]="actionId() === link.id">Disable</button>
+                    } @else {
+                      <button type="button" (click)="enable(link)" [disabled]="actionId() === link.id">Enable</button>
+                    }
+                    <button type="button" class="danger" (click)="confirmDelete.set(link)" [disabled]="actionId() === link.id">Delete</button>
+                  } @else {
+                    <span class="muted">Owner actions blocked</span>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mobile-cards">
+      @for (link of results.content; track link.id) {
+        <article class="link-card">
+          <div class="card-title">
+            <a [routerLink]="['/app/urls', link.id]">{{ link.shortCode }}</a>
+            <app-status-badge [state]="link.state" />
+          </div>
+          <p>{{ host(link.originalUrl) }}</p>
+          <p>{{ link.campaign?.name ?? 'No campaign' }} · {{ link.clickCount }} clicks</p>
+          <div class="tags">
+            @for (tag of link.tags; track tag) {
+              <app-tag-chip [tag]="tag" />
+            }
+          </div>
+          <div class="row-actions">
+            <app-copy-button [value]="link.shortUrl" label="Copy" />
+            <a class="icon-action" [href]="link.shortUrl" target="_blank" rel="noreferrer">Open</a>
+            @if (ownerActionsAllowed(link)) {
+              @if (link.enabled) {
+                <button type="button" (click)="disable(link)">Disable</button>
+              } @else {
+                <button type="button" (click)="enable(link)">Enable</button>
+              }
+            }
+          </div>
+        </article>
+      }
+    </div>
+
+    <app-pagination
+      [page]="results.number"
+      [totalPages]="results.totalPages"
+      [totalElements]="results.totalElements"
+      [pageSize]="results.size"
+      (pageChange)="changePage($event)"
+      (pageSizeChange)="changePageSize($event)"
+    />
+  }
+}
+
+<app-confirm-dialog
+  [open]="!!confirmDelete()"
+  title="Delete link"
+  description="This soft-deletes the link for the selected workspace. Redirects for this link will stop resolving."
+  confirmLabel="Delete"
+  (confirmed)="deleteConfirmed()"
+  (cancelled)="confirmDelete.set(null)"
+/>

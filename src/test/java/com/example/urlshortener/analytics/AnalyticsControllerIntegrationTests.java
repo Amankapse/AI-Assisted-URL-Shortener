@@ -10,6 +10,9 @@ import com.example.urlshortener.user.entity.UserEntity;
 import com.example.urlshortener.user.entity.UserRole;
 import com.example.urlshortener.user.entity.UserStatus;
 import com.example.urlshortener.user.repository.UserRepository;
+import com.example.urlshortener.workspace.entity.WorkspaceEntity;
+import com.example.urlshortener.workspace.repository.WorkspaceMembershipRepository;
+import com.example.urlshortener.workspace.repository.WorkspaceRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +33,7 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.containsString;
+import static com.example.urlshortener.testsupport.WorkspaceTestSupport.defaultWorkspace;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -46,6 +50,8 @@ class AnalyticsControllerIntegrationTests {
     @Autowired RefreshTokenRepository refreshTokenRepository;
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired ClickAnalyticsWriter writer;
+    @Autowired WorkspaceRepository workspaceRepository;
+    @Autowired WorkspaceMembershipRepository workspaceMembershipRepository;
 
     @BeforeEach
     void cleanDatabase() {
@@ -60,7 +66,11 @@ class AnalyticsControllerIntegrationTests {
         String ownerToken = registerAndLogin("owner@example.com");
         String otherToken = registerAndLogin("other@example.com");
         UserEntity owner = userRepository.findByEmail("owner@example.com").orElseThrow();
-        ShortUrlEntity url = shortUrlRepository.saveAndFlush(new ShortUrlEntity(UUID.randomUUID(), "abc1234", "https://example.com/private?token=secret", null, owner, LocalDateTime.now().plusDays(1)));
+        WorkspaceEntity workspace = workspaceMembershipRepository.findByUserIdWithWorkspace(owner.getId()).stream()
+                .findFirst()
+                .map(membership -> membership.getWorkspace())
+                .orElseGet(() -> defaultWorkspace(owner, workspaceRepository, workspaceMembershipRepository));
+        ShortUrlEntity url = shortUrlRepository.saveAndFlush(new ShortUrlEntity(UUID.randomUUID(), "abc1234", "https://example.com/private?token=secret", null, owner, workspace, LocalDateTime.now().plusDays(1)));
         writer.persistBatch(List.of(
                 new ClickAnalyticsEvent(UUID.randomUUID(), url.getId(), LocalDateTime.of(2026, 8, 7, 10, 0), "hash1", "desktop", "ref.example", "corr-1"),
                 new ClickAnalyticsEvent(UUID.randomUUID(), url.getId(), LocalDateTime.of(2026, 8, 7, 11, 0), "hash2", "mobile", "ref.example", "corr-2")
@@ -87,7 +97,11 @@ class AnalyticsControllerIntegrationTests {
         String userToken = registerAndLogin("user@example.com");
         String adminToken = createAdminAndLogin("admin@example.com");
         UserEntity owner = userRepository.findByEmail("user@example.com").orElseThrow();
-        ShortUrlEntity url = shortUrlRepository.saveAndFlush(new ShortUrlEntity(UUID.randomUUID(), "top1234", "https://example.com/private?token=secret", null, owner, LocalDateTime.now().plusDays(1)));
+        WorkspaceEntity workspace = workspaceMembershipRepository.findByUserIdWithWorkspace(owner.getId()).stream()
+                .findFirst()
+                .map(membership -> membership.getWorkspace())
+                .orElseGet(() -> defaultWorkspace(owner, workspaceRepository, workspaceMembershipRepository));
+        ShortUrlEntity url = shortUrlRepository.saveAndFlush(new ShortUrlEntity(UUID.randomUUID(), "top1234", "https://example.com/private?token=secret", null, owner, workspace, LocalDateTime.now().plusDays(1)));
         writer.persistBatch(List.of(new ClickAnalyticsEvent(UUID.randomUUID(), url.getId(), LocalDateTime.now(), "hash1", "desktop", "ref.example", "corr-1")));
 
         mockMvc.perform(get("/api/v1/admin/analytics/overview").header(HttpHeaders.AUTHORIZATION, userToken))

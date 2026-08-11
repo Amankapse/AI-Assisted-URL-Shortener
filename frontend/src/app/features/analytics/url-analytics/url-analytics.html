@@ -1,0 +1,55 @@
+<section class="page-header">
+  <div>
+    <p class="eyebrow">URL analytics</p>
+    <h1>{{ summary()?.shortCode ?? 'Analytics' }}</h1>
+  </div>
+  <a class="secondary-action" [routerLink]="['/app/urls', id]">Back to details</a>
+</section>
+
+@if (loading()) {
+  <p class="muted">Loading analytics...</p>
+} @else if (problem(); as currentProblem) {
+  <app-error-state [problem]="currentProblem" (retry)="load()" />
+} @else if (summary(); as current) {
+  <section class="kpis">
+    <article>
+      <span>Total redirects</span>
+      <strong>{{ current.totalRedirects }}</strong>
+    </article>
+    <article>
+      <span>Last accessed</span>
+      <strong>{{ current.lastAccessedAt ? (current.lastAccessedAt | date:'medium') : 'Never' }}</strong>
+    </article>
+    <article>
+      <span>State</span>
+      <app-status-badge [state]="current.state" />
+    </article>
+  </section>
+
+  @if (current.totalRedirects === 0) {
+    <app-empty-state title="No redirects yet" detail="Analytics will appear after the short link is visited." />
+  } @else {
+    <section class="panel">
+      <h2>Daily redirects</h2>
+      <div class="trend" aria-hidden="true">
+        @for (day of daily()?.days ?? []; track day.day) {
+          <div class="bar-row">
+            <span>{{ day.day | date:'MMM d' }}</span>
+            <div><i [style.width]="barWidth(day.redirects)"></i></div>
+            <strong>{{ day.redirects }}</strong>
+          </div>
+        }
+      </div>
+      <table>
+        <thead>
+          <tr><th>Day</th><th>Redirects</th></tr>
+        </thead>
+        <tbody>
+          @for (day of daily()?.days ?? []; track day.day) {
+            <tr><td>{{ day.day | date:'mediumDate' }}</td><td>{{ day.redirects }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </section>
+  }
+}

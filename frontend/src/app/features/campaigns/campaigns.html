@@ -1,0 +1,70 @@
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Workspace</p>
+    <h1>Campaigns</h1>
+  </div>
+</section>
+
+@if (!workspaceId()) {
+  <app-empty-state title="No workspace selected" detail="Select a workspace to manage campaigns." />
+} @else {
+  @if (problem(); as currentProblem) {
+    <app-error-state [problem]="currentProblem" />
+  }
+
+  <section class="layout">
+    <form [formGroup]="form" (ngSubmit)="submit()" class="panel">
+      <h2>{{ editing() ? 'Edit campaign' : 'Create campaign' }}</h2>
+      @if (!canManage()) {
+        <p class="muted">Your workspace role can view campaigns but cannot create or edit them.</p>
+      }
+      <label>
+        Name
+        <input formControlName="name" [disabled]="!canManage()" />
+      </label>
+      <label>
+        Description
+        <textarea formControlName="description" rows="4" [disabled]="!canManage()"></textarea>
+      </label>
+      <div class="actions">
+        <button type="submit" [disabled]="saving() || !canManage()">{{ editing() ? 'Save campaign' : 'Create campaign' }}</button>
+        @if (editing()) {
+          <button type="button" class="secondary-action" (click)="cancelEdit()">Cancel</button>
+        }
+      </div>
+    </form>
+
+    <section class="panel">
+      <h2>Campaign list</h2>
+      @if (loading()) {
+        <p class="muted">Loading campaigns...</p>
+      } @else if (!campaigns().length) {
+        <app-empty-state title="No campaigns yet" detail="Create one when this workspace needs grouping for links." />
+      } @else {
+        <div class="campaign-list">
+          @for (campaign of campaigns(); track campaign.id) {
+            <article class="campaign-row">
+              <div>
+                <h3>{{ campaign.name }}</h3>
+                <p>{{ campaign.description || 'No description' }}</p>
+              </div>
+              <div class="actions">
+                <button type="button" class="secondary-action" (click)="startEdit(campaign)" [disabled]="!canManage()">Edit</button>
+                <button type="button" class="danger" (click)="confirmDelete.set(campaign)" [disabled]="!canDelete()">Delete</button>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+  </section>
+}
+
+<app-confirm-dialog
+  [open]="!!confirmDelete()"
+  title="Delete campaign"
+  description="Links remain active. This removes only the campaign grouping."
+  confirmLabel="Delete"
+  (confirmed)="deleteConfirmed()"
+  (cancelled)="confirmDelete.set(null)"
+/>

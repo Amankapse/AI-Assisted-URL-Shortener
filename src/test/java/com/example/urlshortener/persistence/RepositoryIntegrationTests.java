@@ -2,6 +2,7 @@ package com.example.urlshortener.persistence;
 
 import com.example.urlshortener.analytics.entity.ClickEventEntity;
 import com.example.urlshortener.analytics.repository.ClickEventRepository;
+import com.example.urlshortener.apikey.repository.ApiKeyRepository;
 import com.example.urlshortener.auth.repository.RefreshTokenRepository;
 import com.example.urlshortener.url.entity.ShortUrlEntity;
 import com.example.urlshortener.url.repository.ShortUrlRepository;
@@ -9,6 +10,9 @@ import com.example.urlshortener.user.entity.UserEntity;
 import com.example.urlshortener.user.entity.UserRole;
 import com.example.urlshortener.user.entity.UserStatus;
 import com.example.urlshortener.user.repository.UserRepository;
+import com.example.urlshortener.workspace.entity.WorkspaceEntity;
+import com.example.urlshortener.workspace.repository.WorkspaceMembershipRepository;
+import com.example.urlshortener.workspace.repository.WorkspaceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +28,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.example.urlshortener.testsupport.WorkspaceTestSupport.defaultWorkspace;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -44,9 +49,19 @@ class RepositoryIntegrationTests {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private WorkspaceMembershipRepository workspaceMembershipRepository;
+
+    @Autowired
+    private ApiKeyRepository apiKeyRepository;
+
     @BeforeEach
     void cleanDatabase() {
         refreshTokenRepository.deleteAll();
+        apiKeyRepository.deleteAll();
         clickEventRepository.deleteAll();
         shortUrlRepository.deleteAll();
         userRepository.deleteAll();
@@ -61,7 +76,7 @@ class RepositoryIntegrationTests {
                 "select indexname from pg_indexes where schemaname = 'public'",
                 String.class);
 
-        assertThat(tables).contains("users", "short_urls", "click_events", "refresh_tokens", "flyway_schema_history");
+        assertThat(tables).contains("users", "short_urls", "click_events", "refresh_tokens", "workspaces", "workspace_memberships", "audit_events", "api_keys", "flyway_schema_history");
         assertThat(indexes).contains(
                 "idx_short_urls_short_code",
                 "idx_short_urls_owner_id",
@@ -73,8 +88,23 @@ class RepositoryIntegrationTests {
                 "idx_refresh_tokens_family_id",
                 "idx_refresh_tokens_expires_at",
                 "idx_refresh_tokens_active_lookup",
-                "idx_click_events_url_clicked_at"
+                "idx_click_events_url_clicked_at",
+                "idx_workspace_memberships_user_id",
+                "idx_short_urls_workspace_created_at",
+                "idx_short_urls_workspace_short_code",
+                "idx_audit_events_workspace_occurred_at",
+                "idx_audit_events_resource_occurred_at",
+                "idx_audit_events_actor_occurred_at",
+                "idx_audit_events_action_occurred_at",
+                "uq_api_keys_key_prefix",
+                "uq_api_keys_key_digest",
+                "idx_api_keys_workspace_revoked_at",
+                "idx_api_keys_workspace_created_at"
         );
+        String metadataType = jdbcTemplate.queryForObject(
+                "select data_type from information_schema.columns where table_name = 'audit_events' and column_name = 'metadata'",
+                String.class);
+        assertThat(metadataType).isEqualTo("jsonb");
     }
 
     @Test
@@ -119,6 +149,7 @@ class RepositoryIntegrationTests {
                 .map(ShortUrlEntity::getId)
                 .contains(legacy.getId());
         assertThat(shortUrlRepository.findByIdAndOwner(first.getId(), other)).isEmpty();
+        assertThat(shortUrlRepository.findByIdAndWorkspaceId(first.getId(), first.getWorkspace().getId())).isPresent();
     }
 
     @Test
@@ -150,6 +181,7 @@ class RepositoryIntegrationTests {
     }
 
     private ShortUrlEntity shortUrl(String shortCode, String originalUrl, UserEntity owner) {
-        return new ShortUrlEntity(UUID.randomUUID(), shortCode, originalUrl, null, owner, LocalDateTime.now().plusDays(1));
+        WorkspaceEntity workspace = defaultWorkspace(owner, workspaceRepository, workspaceMembershipRepository);
+        return new ShortUrlEntity(UUID.randomUUID(), shortCode, originalUrl, null, owner, workspace, LocalDateTime.now().plusDays(1));
     }
 }

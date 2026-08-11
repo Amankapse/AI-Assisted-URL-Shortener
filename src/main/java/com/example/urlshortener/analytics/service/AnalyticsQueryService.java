@@ -11,9 +11,10 @@ import com.example.urlshortener.common.exception.ResourceNotFoundException;
 import com.example.urlshortener.common.ratelimit.RateLimiterService;
 import com.example.urlshortener.url.entity.ShortUrlEntity;
 import com.example.urlshortener.url.repository.ShortUrlRepository;
-import com.example.urlshortener.user.entity.UserEntity;
 import com.example.urlshortener.user.repository.UserRepository;
 import com.example.urlshortener.user.service.CurrentOwnerProvider;
+import com.example.urlshortener.workspace.service.WorkspaceContext;
+import com.example.urlshortener.workspace.service.WorkspaceContextResolver;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,7 @@ public class AnalyticsQueryService {
     private final AnalyticsProperties properties;
     private final Clock clock;
     private final RateLimiterService rateLimiter;
+    private final WorkspaceContextResolver workspaceContextResolver;
 
     public AnalyticsQueryService(ShortUrlRepository shortUrlRepository,
                                  ClickEventRepository clickEventRepository,
@@ -39,7 +41,8 @@ public class AnalyticsQueryService {
                                  CurrentOwnerProvider currentOwnerProvider,
                                  AnalyticsProperties properties,
                                  Clock clock,
-                                 RateLimiterService rateLimiter) {
+                                 RateLimiterService rateLimiter,
+                                 WorkspaceContextResolver workspaceContextResolver) {
         this.shortUrlRepository = shortUrlRepository;
         this.clickEventRepository = clickEventRepository;
         this.userRepository = userRepository;
@@ -47,11 +50,17 @@ public class AnalyticsQueryService {
         this.properties = properties;
         this.clock = clock;
         this.rateLimiter = rateLimiter;
+        this.workspaceContextResolver = workspaceContextResolver;
     }
 
     @Transactional(readOnly = true)
     public UrlAnalyticsResponse urlAnalytics(UUID urlId) {
-        ShortUrlEntity url = ownedUrl(urlId);
+        return urlAnalytics(urlId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public UrlAnalyticsResponse urlAnalytics(UUID urlId, String workspaceHeader) {
+        ShortUrlEntity url = workspaceUrl(urlId, workspaceHeader);
         return new UrlAnalyticsResponse(
                 url.getId(),
                 url.getShortCode(),
@@ -63,7 +72,12 @@ public class AnalyticsQueryService {
 
     @Transactional(readOnly = true)
     public DailyRedirectsResponse dailyAnalytics(UUID urlId) {
-        ShortUrlEntity url = ownedUrl(urlId);
+        return dailyAnalytics(urlId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public DailyRedirectsResponse dailyAnalytics(UUID urlId, String workspaceHeader) {
+        ShortUrlEntity url = workspaceUrl(urlId, workspaceHeader);
         List<DailyRedirects> days = clickEventRepository.countDailyByUrlId(url.getId()).stream()
                 .map(row -> new DailyRedirects(row.getDay(), row.getRedirects()))
                 .toList();
@@ -92,9 +106,9 @@ public class AnalyticsQueryService {
                 .toList();
     }
 
-    private ShortUrlEntity ownedUrl(UUID urlId) {
-        UserEntity owner = userRepository.getReferenceById(currentOwnerProvider.getCurrentOwner().userId());
-        return shortUrlRepository.findByIdAndOwner(urlId, owner)
+    private ShortUrlEntity workspaceUrl(UUID urlId, String workspaceHeader) {
+        WorkspaceContext workspace = workspaceContextResolver.resolveForAnalyticsReader(workspaceHeader);
+        return shortUrlRepository.findByIdAndWorkspaceId(urlId, workspace.workspaceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Short URL not found"));
     }
 

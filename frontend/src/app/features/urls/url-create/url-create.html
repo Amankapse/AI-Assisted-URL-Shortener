@@ -1,0 +1,95 @@
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Link management</p>
+    <h1>Create short link</h1>
+  </div>
+  <a class="secondary-action" routerLink="/app/urls">Back to links</a>
+</section>
+
+@if (!workspaceId()) {
+  <app-empty-state title="No workspace selected" detail="Select a workspace before creating links." />
+} @else if (created(); as link) {
+  <section class="success-panel" aria-live="polite">
+    <p class="eyebrow">Created</p>
+    <h2>{{ link.shortCode }}</h2>
+    <p class="short-url">{{ link.shortUrl }}</p>
+    <div class="actions">
+      <app-copy-button [value]="link.shortUrl" label="Copy" />
+      <a class="primary-action" [href]="link.shortUrl" target="_blank" rel="noreferrer">Open</a>
+      <a class="secondary-action" [routerLink]="['/app/urls', link.id]">View details</a>
+      <button type="button" (click)="createAnother()">Create another</button>
+    </div>
+  </section>
+} @else {
+  <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
+    @if (problem(); as currentProblem) {
+      <app-error-state [problem]="currentProblem" />
+    }
+
+    <label>
+      Destination URL
+      <input type="url" formControlName="originalUrl" autocomplete="off" placeholder="https://example.com/page" />
+      @if (form.controls.originalUrl.touched && form.controls.originalUrl.invalid) {
+        <span class="field-error">Enter a valid HTTP or HTTPS URL.</span>
+      }
+    </label>
+
+    <label>
+      Custom alias
+      <input formControlName="customAlias" autocomplete="off" placeholder="optional-alias" />
+      @if (form.controls.customAlias.touched && form.controls.customAlias.invalid) {
+        <span class="field-error">Use letters, numbers, dashes or underscores, max 100 characters.</span>
+      }
+    </label>
+
+    <label>
+      Expiration
+      <input type="datetime-local" formControlName="expiresAt" />
+      @if (form.controls.expiresAt.touched && form.controls.expiresAt.invalid) {
+        <span class="field-error">Expiration must be a future date and time.</span>
+      }
+    </label>
+
+    <label>
+      Campaign
+      <select formControlName="campaignId" [disabled]="loadingOptions()">
+        <option value="">No campaign</option>
+        @for (campaign of campaigns(); track campaign.id) {
+          <option [value]="campaign.id">{{ campaign.name }}</option>
+        }
+      </select>
+    </label>
+
+    <div class="tags-field">
+      <label for="tagInput">Tags</label>
+      <div class="tag-entry">
+        <input
+          id="tagInput"
+          [formControl]="tagControl"
+          list="availableTags"
+          autocomplete="off"
+          placeholder="release"
+          (keydown.enter)="$event.preventDefault(); addTag()"
+        />
+        <button type="button" (click)="addTag()" [disabled]="tags().length >= tagLimit">Add</button>
+      </div>
+      <datalist id="availableTags">
+        @for (tag of existingTagNames(); track tag) {
+          <option [value]="tag"></option>
+        }
+      </datalist>
+      @if (tagControl.touched && tagControl.invalid) {
+        <span class="field-error">Tags use letters, numbers, dashes or underscores.</span>
+      }
+      <div class="tag-list" aria-label="Selected tags">
+        @for (tag of tags(); track tag) {
+          <app-tag-chip [tag]="tag" [removable]="true" (removed)="removeTag(tag)" />
+        }
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" [disabled]="submitting()">{{ submitting() ? 'Creating...' : 'Create link' }}</button>
+    </div>
+  </form>
+}

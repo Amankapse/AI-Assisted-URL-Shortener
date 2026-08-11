@@ -1,7 +1,7 @@
 package com.example.urlshortener.redirect.cache;
 
 import com.example.urlshortener.analytics.repository.ClickEventRepository;
-import com.example.urlshortener.analytics.service.ClickAnalyticsPublisher;
+import com.example.urlshortener.analytics.service.LocalQueueClickEventPublisher;
 import com.example.urlshortener.auth.repository.RefreshTokenRepository;
 import com.example.urlshortener.url.repository.ShortUrlRepository;
 import com.example.urlshortener.user.repository.UserRepository;
@@ -57,7 +57,7 @@ class RedirectCacheRedisIntegrationTests {
     @Autowired ClickEventRepository clickEventRepository;
     @Autowired ShortUrlRepository shortUrlRepository;
     @Autowired UserRepository userRepository;
-    @Autowired ClickAnalyticsPublisher clickAnalyticsPublisher;
+    @Autowired LocalQueueClickEventPublisher clickAnalyticsPublisher;
 
     @BeforeEach
     void cleanDatabase() {

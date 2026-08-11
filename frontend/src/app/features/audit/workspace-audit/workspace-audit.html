@@ -1,0 +1,68 @@
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Workspace audit</p>
+    <h1>Audit trail</h1>
+  </div>
+</section>
+
+<form [formGroup]="filters" class="filters">
+  <label>From <input type="datetime-local" formControlName="from" /></label>
+  <label>To <input type="datetime-local" formControlName="to" /></label>
+  <label>
+    Action
+    <select formControlName="action"><option value="">Any</option>@for (action of actions; track action) { <option [value]="action">{{ action }}</option> }</select>
+  </label>
+  <label>
+    Resource
+    <select formControlName="resourceType"><option value="">Any</option>@for (type of resourceTypes; track type) { <option [value]="type">{{ type }}</option> }</select>
+  </label>
+  <label>
+    Actor
+    <select formControlName="actorType"><option value="">Any</option>@for (type of actorTypes; track type) { <option [value]="type">{{ type }}</option> }</select>
+  </label>
+</form>
+
+@if (loading()) {
+  <p class="muted">Loading audit events...</p>
+} @else if (problem(); as currentProblem) {
+  <app-error-state [problem]="currentProblem" (retry)="load()" />
+} @else if (page(); as result) {
+  @if (result.empty) {
+    <app-empty-state title="No audit events" detail="No events match the current filters." />
+  } @else {
+    <div class="audit-list">
+      @for (event of result.content; track event.id) {
+        <article class="audit-row">
+          <div>
+            <strong>{{ event.action }}</strong>
+            <span>{{ event.occurredAt | date:'medium' }}</span>
+          </div>
+          <div>
+            <span>{{ event.resourceType }}</span>
+            <code>{{ event.resourceId }}</code>
+          </div>
+          <div>
+            <span>{{ event.actorType }}</span>
+            <code>{{ event.actorId }}</code>
+          </div>
+          <div class="metadata">
+            @for (entry of safeMetadataEntries(event); track entry.key) {
+              <span><b>{{ entry.key }}</b>: {{ entry.value }}</span>
+            }
+          </div>
+          @if (event.correlationId) {
+            <small>Correlation ID: {{ event.correlationId }}</small>
+          }
+        </article>
+      }
+    </div>
+    <app-pagination
+      [page]="result.number"
+      [totalPages]="result.totalPages"
+      [totalElements]="result.totalElements"
+      [pageSize]="result.size"
+      (pageChange)="load($event, result.size)"
+      (pageSizeChange)="load(0, $event)"
+    />
+  }
+}

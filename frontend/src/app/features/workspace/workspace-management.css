@@ -1,0 +1,100 @@
+.page-header,
+.panel,
+.member-row {
+  background: #ffffff;
+  border: 1px solid #d7dee8;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.page-header {
+  margin-bottom: 1rem;
+}
+
+.eyebrow,
+.muted {
+  color: #64748b;
+}
+
+.eyebrow {
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+}
+
+.layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(18rem, 0.8fr) minmax(0, 1.2fr);
+}
+
+.panel,
+.stack,
+.member-form,
+.member-list,
+label {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.member-form {
+  grid-template-columns: 1fr 12rem auto;
+}
+
+input,
+select {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  min-height: 2.4rem;
+  padding: 0 0.7rem;
+}
+
+.member-row {
+  align-items: center;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr 11rem auto;
+}
+
+button {
+  background: #0f766e;
+  border: 1px solid #0f766e;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  min-height: 2.35rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.danger {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.badge {
+  background: #e0f2fe;
+  border-radius: 999px;
+  color: #075985;
+  padding: 0.2rem 0.45rem;
+}
+
+@media (max-width: 860px) {
+  .layout,
+  .member-form,
+  .member-row {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+}
