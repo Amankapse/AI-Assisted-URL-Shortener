@@ -41,7 +41,7 @@
 
 ## Historical phase validation results
 
-The following phase counts are retained as historical milestones. Before Stage 8, the suite contained 113 backend tests. Stage 8 added 5 integration tests, bringing the verified backend suite to 118 tests. Stage 9A adds 7 Angular frontend unit tests.
+The following phase counts are retained as historical milestones. Before Stage 8, the suite contained 113 backend tests. Stage 8 added 5 integration tests, bringing the verified backend suite to 118 tests. Stage 9A added 7 Angular frontend unit tests, and the Stage 9D amendment brings the current validated suites to 120 backend tests and 22 frontend tests.
 
 ## Historical Phase 2 validation result
 
@@ -109,7 +109,7 @@ Validation confirmed 7 Angular unit tests and a production build with initial bu
 
 ## Final Stage 9D local validation result
 
-The final Stage 9D local validation suite contains 118 backend tests and 21 frontend tests and passes with:
+The final Stage 9D local validation suite contains 120 backend tests and 22 frontend tests and passes with:
 
 ```powershell
 .\mvnw.cmd clean verify
@@ -120,12 +120,15 @@ npm ci
 npm test -- --watch=false
 npm run build
 npm run build:render
+docker build -t url-shortener-fullstack .
 ```
 
 The final suite includes tests for Redis-backed limiter isolation and outage behavior, generic 429 Problem Details, correlation ID sanitization and propagation, Actuator exposure, security headers, liveness/readiness policy, application metric counters, bounded Micrometer tags, short-code configuration and collision metrics, quota enforcement, V4 moderation persistence, admin block/unblock authorization, blocked redirects, blocked cache DTO behavior, legacy 7-character short-code resolution, derived full short URL responses, optional idempotent create, ETag/If-Match destination updates, workspace tenant isolation, workspace RBAC, workspace-scoped idempotency, workspace-bound API-key authentication, transactional outbox delivery behavior, and Stage 8 campaign/tag/search behavior.
 
-The final green run used PostgreSQL Testcontainers and Redis Testcontainers, validated Flyway V1 through V10, applied all ten migrations to clean PostgreSQL containers, and completed Hibernate schema validation. JaCoCo results are recorded in [coverage-summary.md](coverage-summary.md). `dependency:tree` confirmed Spring Boot-managed `flyway-core:11.7.2`, `flyway-database-postgresql:11.7.2`, Micrometer `1.15.0`, Spring Boot Actuator `3.5.0`, `spring-boot-starter-data-redis:3.5.0`, Lettuce `6.5.5.RELEASE`, Testcontainers `1.21.0`, and no added outbox or rate-limiting library. `docker compose config` passed without warnings when run with normal Docker config access.
+The final green run used PostgreSQL Testcontainers and Redis Testcontainers, validated Flyway V1 through V10, applied all ten migrations to clean PostgreSQL containers, and completed Hibernate schema validation. JaCoCo results are recorded in [coverage-summary.md](coverage-summary.md). `dependency:tree` confirmed Spring Boot-managed `flyway-core:11.7.2`, `flyway-database-postgresql:11.7.2`, Micrometer `1.15.0`, Spring Boot Actuator `3.5.0`, `spring-boot-starter-data-redis:3.5.0`, Lettuce `6.5.5.RELEASE`, Testcontainers `1.21.0`, and no added outbox or rate-limiting library. `docker compose config` passed without warnings when run with normal Docker config access. The combined Docker image build passed and produced a packaged Spring Boot executable JAR containing Angular `index.html`, `app-config.json`, hashed JS, and CSS assets.
 
-Frontend validation confirmed `npm ci`, 21 Angular tests, the standard production build, and the Render production build. The initial Angular bundle remains 103.64 kB raw / 26.71 kB estimated transfer. `npm audit --audit-level=moderate` reports the known 3 moderate Angular CLI development-chain findings through `@modelcontextprotocol/sdk` and `@hono/node-server`; `npm audit --audit-level=high` passes. Forced remediation remains rejected because it would downgrade Angular CLI.
+Frontend validation confirmed `npm ci`, 22 Angular tests, the standard production build, and the Render production build. The initial Angular bundle remains 103.64 kB raw / 26.69 kB estimated transfer. `npm audit --audit-level=moderate` reports the known 3 moderate Angular CLI development-chain findings through `@modelcontextprotocol/sdk` and `@hono/node-server`; `npm audit --audit-level=high` passes. Forced remediation remains rejected because it would downgrade Angular CLI.
+
+A local packaged-image smoke test ran the combined image with `PORT=10000` and ephemeral JWT PEM values generated under the temp directory. Tomcat started on port `10000`; Docker exposed `0.0.0.0:18080->10000/tcp`. `/`, `/login`, `/register`, `/app/urls`, and `/app/admin/outbox` served the SPA shell; `/api/v1/auth/me` returned backend `401`, `/r/test` returned backend `404`, liveness/readiness returned `200`, Swagger UI returned `200`, `/v3/api-docs` returned OpenAPI JSON, and the hashed Angular main JS asset returned `200`.
 
 `scripts/verify.sh` was attempted, but the Bash environment failed before Maven startup because `JAVA_HOME` is not defined there. The equivalent required Windows commands above passed.

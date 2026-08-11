@@ -2,8 +2,7 @@
 
 This folder documents a live demonstration deployment on Render using:
 
-- Render Web Service for the Spring Boot container
-- Render Static Site for the Angular frontend
+- one Render Web Service Docker container for the packaged Angular SPA and Spring Boot API
 - Neon PostgreSQL for the production database
 - Render Key Value / Valkey for Redis-compatible cache and rate-limit storage
 
@@ -13,8 +12,8 @@ This is the deployable live-demo path for the current modular monolith. It is se
 
 | Document | Purpose |
 | --- | --- |
-| [Render deployment](render.md) | Render Web Service, Static Site, and Key Value setup |
-| [Render Static Site frontend](frontend-render.md) | Angular build, publish directory, SPA rewrite, public runtime config, and headers |
+| [Render deployment](render.md) | Single Render Web Service, Docker packaging, Neon, and Key Value setup |
+| [Future Static Site frontend](frontend-render.md) | Optional future Angular CDN/static split, publish directory, SPA rewrite, public runtime config, and headers |
 | [Neon PostgreSQL](neon.md) | Neon database setup and JDBC configuration |
 | [Environment variables](environment-variables.md) | Required and optional production variables |
 | [Production validation](production-validation.md) | Health, OpenAPI, and smoke-test checks |

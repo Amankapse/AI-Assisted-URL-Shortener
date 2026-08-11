@@ -34,6 +34,6 @@ npm test -- --watch=false
 npm run build
 ```
 
-Stage 9C validation: `npm test -- --watch=false` passed with 21 tests, and `npm run build` passed with initial bundle 103.64 kB raw / 26.71 kB estimated transfer. The local sandbox blocks Angular compiler reads for source/style files and `node_modules`, so frontend validation commands are run with scoped filesystem access outside the sandbox.
+Stage 9D validation: `npm test -- --watch=false` passed with 22 tests, and `npm run build` passed with initial bundle 103.64 kB raw / 26.69 kB estimated transfer. The packaged-image smoke test also confirmed that Angular SPA routes and backend routes are served correctly from one Spring Boot Docker image. The local sandbox blocks Angular compiler reads for source/style files and `node_modules`, so frontend validation commands are run with scoped filesystem access outside the sandbox.
 
 End-to-end browser automation is deferred.

@@ -6,7 +6,7 @@ This directory contains the detailed evidence for the AI-Assisted URL Shortener 
 
 - [Deployment overview](deployment/README.md)
 - [Render deployment](deployment/render.md)
-- [Render Static Site frontend](deployment/frontend-render.md)
+- [Future Static Site frontend](deployment/frontend-render.md)
 - [Neon PostgreSQL](deployment/neon.md)
 - [Environment variables](deployment/environment-variables.md)
 - [Production validation](deployment/production-validation.md)

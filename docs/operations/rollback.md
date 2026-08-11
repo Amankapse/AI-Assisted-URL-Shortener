@@ -1,12 +1,14 @@
 # Rollback Guide
 
-## Backend application rollback
+## Application rollback
 
-Rollback by deploying the previous application artifact or Docker image. Keep environment variables compatible with the target version.
+Rollback by deploying the previous application artifact or Docker image. In the current Render deployment, that image contains both the Angular SPA and Spring Boot API.
 
-## Frontend rollback
+Keep environment variables compatible with the target version. Frontend public build variables such as `FRONTEND_API_BASE_URL` and `FRONTEND_PUBLIC_SHORT_URL_BASE` are baked into `app-config.json` during the Docker build, so changing them requires rebuilding/redeploying the image.
 
-Rollback the Render Static Site to the previous successful deploy or redeploy the previous frontend commit. Keep `FRONTEND_API_BASE_URL` and `FRONTEND_PUBLIC_SHORT_URL_BASE` pointed at the compatible backend origin. Do not replace the SPA rewrite with a redirect; Angular client routes require a rewrite to `index.html`.
+## Future split frontend rollback
+
+If Angular is later split back to Render Static Site/CDN hosting, rollback that static deployment independently from the backend. Do not replace an SPA rewrite with a redirect; Angular client routes require a rewrite to `index.html`.
 
 ## Docker image rollback
 

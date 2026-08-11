@@ -14,7 +14,7 @@ Prerequisites:
 - `APP_AUDIT_METADATA_MAX_BYTES` and `APP_AUDIT_RETENTION` reviewed for the environment
 - `APP_OUTBOX_*` dispatcher, retry, payload, and retention settings reviewed for the environment
 - `SHORTENER_CODE_LENGTH`, `SHORTENER_CODE_MAX_RETRIES`, and quota settings reviewed for the environment
-- Angular Static Site public runtime config values set for the deployed backend:
+- Angular public runtime config values set for the packaged Web Service:
   `FRONTEND_API_BASE_URL`, `FRONTEND_PUBLIC_SHORT_URL_BASE`, and `FRONTEND_ENVIRONMENT`
 
 Start local dependencies:
@@ -138,21 +138,21 @@ Do not manually update outbox rows in production without a documented repair pla
 
 ## Frontend deploy issue
 
-Expected Render Static Site settings:
+Expected single Render Web Service behavior:
 
-- Root directory: `frontend`
-- Build command: `npm ci && npm run build:render`
-- Publish directory: `dist/frontend/browser`
-- SPA rewrite: `/*` to `/index.html`
+- Docker build runs Angular `npm run build:render`.
+- Docker build copies `frontend/dist/frontend/browser` into Spring Boot static resources before Maven package.
+- `/`, `/login`, `/register`, and `/app/**` serve Angular.
+- `/api/v1/**`, `/r/**`, `/actuator/**`, `/swagger-ui/**`, and `/v3/api-docs/**` remain backend routes.
 - Public runtime config: `FRONTEND_API_BASE_URL`, `FRONTEND_PUBLIC_SHORT_URL_BASE`, and `FRONTEND_ENVIRONMENT`
 
 Investigate:
 
-- `dist/frontend/browser/app-config.json` contains the public backend origin and no secrets.
-- Direct Angular routes reload successfully because the rewrite is active.
-- Static headers allow only the deployed backend in `connect-src`.
-- Browser network requests target the Render backend, not `localhost`.
-- CORS and CSRF behavior match the deployed frontend/backend origins.
+- The built JAR contains `BOOT-INF/classes/static/index.html` and `BOOT-INF/classes/static/app-config.json`.
+- `app-config.json` contains `apiBaseUrl: ""` for same-origin calls and no secrets.
+- Browser network requests target `/api/v1/...`, not `localhost` or an internal Render URL.
+- Direct Angular routes reload successfully through Spring MVC SPA forwarding.
+- Health check remains `/actuator/health/liveness`, not `/`.
 
 ## CORS, cookie, or CSRF issue
 
@@ -161,9 +161,9 @@ Expected behavior:
 - Backend CORS uses an explicit allowlist and does not use wildcard credentials.
 - Refresh and logout remain CSRF protected.
 - Refresh cookies stay `Secure` and `HttpOnly` in production.
-- SameSite policy remains strict unless a reviewed deployment topology requires a change.
+- SameSite policy remains strict for the same-origin deployment.
 
-If the frontend and backend are deployed on different `*.onrender.com` hostnames, browser cookie behavior may be cross-site. Prefer same-site custom domains such as `app.example.com` and `api.example.com` before weakening cookie policy. Do not switch to `SameSite=None` or loosen CSRF as an emergency workaround without a documented security review.
+Same-origin deployment should not require CORS for Angular's own API calls. If CORS errors appear in the browser, first inspect `app-config.json` for a malformed `apiBaseUrl`. Do not switch to `SameSite=None`, loosen CSRF, or add wildcard CORS as an emergency workaround.
 
 ## High login failures
 

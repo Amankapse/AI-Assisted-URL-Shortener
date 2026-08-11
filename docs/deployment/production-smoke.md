@@ -4,7 +4,7 @@ Use throwaway test users. Do not commit credentials.
 
 ## Frontend Flow
 
-1. Open the Angular frontend.
+1. Open `https://ai-url-shortener-682u.onrender.com/` and confirm Angular loads.
 2. Register a new user.
 3. Log in.
 4. Confirm the workspace selector loads.
@@ -22,6 +22,27 @@ Use throwaway test users. Do not commit credentials.
 16. Revoke the API key.
 17. Logout.
 18. Reload the browser and confirm unauthenticated state.
+
+## Route Regression Checks
+
+```powershell
+$env:BASE_URL="https://ai-url-shortener-682u.onrender.com"
+curl.exe -i "$env:BASE_URL/"
+curl.exe -i "$env:BASE_URL/login"
+curl.exe -i "$env:BASE_URL/app/urls"
+curl.exe -i "$env:BASE_URL/app/admin/outbox"
+curl.exe -i "$env:BASE_URL/api/v1/auth/me"
+curl.exe -i "$env:BASE_URL/actuator/health/liveness"
+curl.exe -i "$env:BASE_URL/swagger-ui/index.html"
+curl.exe -i "$env:BASE_URL/v3/api-docs"
+```
+
+Expected:
+
+- `/`, `/login`, and `/app/**` return Angular.
+- `/api/v1/auth/me` remains a backend security response, normally `401` without a token.
+- Actuator, Swagger, and OpenAPI remain backend routes.
+- `/r/<shortCode>` remains the redirect route.
 
 ## Platform ADMIN Flow
 

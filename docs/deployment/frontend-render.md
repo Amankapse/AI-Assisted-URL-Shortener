@@ -1,6 +1,6 @@
-# Render Static Site Frontend
+# Future Render Static Site Frontend
 
-The Angular frontend deploys independently from the Spring Boot API.
+The current live/demo deployment packages Angular into the Spring Boot Docker image and serves both from one Render Web Service. This document preserves the optional future split path for CDN/static hosting without changing frontend or backend business logic.
 
 ## Render Settings
 
@@ -21,7 +21,7 @@ The checked-in `frontend/public/app-config.json` intentionally contains local va
 
 | Variable | Secret | Example |
 | --- | --- | --- |
-| `FRONTEND_API_BASE_URL` | No | `https://ai-url-shortener-682u.onrender.com` |
+| `FRONTEND_API_BASE_URL` | No | `https://api.example.com` |
 | `FRONTEND_PUBLIC_SHORT_URL_BASE` | No | `https://ai-url-shortener-682u.onrender.com` |
 | `FRONTEND_ENVIRONMENT` | No | `production` |
 
@@ -57,7 +57,7 @@ Configure headers on the Static Site after browser validation:
 
 Do not add `unsafe-eval`. Validate the CSP in the browser console before making it enforcing for a public release.
 
-## CORS Dependency
+## CORS Dependency For Split Deployment
 
 The backend must include the exact frontend origin:
 
@@ -73,7 +73,7 @@ APP_AUTH_ALLOWED_ORIGINS=http://localhost:4200,http://localhost:3000,http://loca
 
 Production must not use `*` with credentialed refresh/logout flows.
 
-## SameSite Cookie Risk
+## SameSite Cookie Risk For Split Deployment
 
 The current backend refresh cookie uses `Secure`, `HttpOnly`, and `SameSite=Strict`. A frontend at `https://<frontend>.onrender.com` calling an API at `https://ai-url-shortener-682u.onrender.com` is likely cross-site for cookie purposes because the subdomains differ.
 
