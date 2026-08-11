@@ -175,3 +175,11 @@ This log records explicit approvals for decisions that affect architecture, secu
 - Security boundary retained: `/api/v1/**`, `/r/**`, `/actuator/**`, `/swagger-ui/**`, and `/v3/api-docs/**` remain backend routes and are not forwarded to Angular.
 - Explicitly not approved: backend migrations, production dependencies, business features, wildcard CORS, `SameSite=None`, disabled CSRF, hash routing, committed Angular `dist/`, or a second Render service for the current deployment.
 - Validation: `.\mvnw.cmd clean verify` passed with 120 backend tests and JaCoCo line 85.13% / branch 60.90%; PostgreSQL and Redis Testcontainers started; Flyway V1-V10 validated/applied; Hibernate schema validation succeeded. `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed; `npm test -- --watch=false` passed with 22 frontend tests; `npm run build` and `npm run build:render` passed; `docker build -t url-shortener-fullstack .` passed; local packaged-image smoke with `PORT=10000` confirmed SPA routes, backend route exclusions, liveness/readiness, Swagger UI, OpenAPI JSON, and hashed JS asset serving. `npm audit --audit-level=high` passed with only known moderate dev-chain findings; `git diff --check` passed; repository and frontend bundle secret scans found no committed secret values.
+
+## Stage 9D CI Test Isolation Correction
+
+- Trigger: GitHub Actions reported `ApiKeyIntegrationTests.cleanAfterTest` failing with `fk_click_events_url` after a successful malformed API-key redirect test.
+- Human-approved scope inherited from Stage 9D: fix release validation only; no new business features, migrations, auth changes, Redis changes, datasource changes, or security weakening.
+- Decision: accepted a test-only cleanup correction that flushes the existing local analytics publisher before deleting dependent tables.
+- Rejected alternatives: sleeps, global analytics disabling, production FK/cascade changes, and redirect analytics behavior changes.
+- Validation: focused `.\mvnw.cmd -q "-Dtest=ApiKeyIntegrationTests" test` passed; full `.\mvnw.cmd clean verify` passed with 120 tests and JaCoCo line 85.13% / branch 60.90%; PostgreSQL and Redis Testcontainers started; Flyway V1-V10 validated/applied; Hibernate schema validation succeeded; `docker compose config` passed.

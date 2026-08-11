@@ -2,6 +2,7 @@ package com.example.urlshortener.apikey;
 
 import com.example.urlshortener.apikey.repository.ApiKeyRepository;
 import com.example.urlshortener.analytics.repository.ClickEventRepository;
+import com.example.urlshortener.analytics.service.LocalQueueClickEventPublisher;
 import com.example.urlshortener.audit.entity.AuditActorType;
 import com.example.urlshortener.audit.entity.AuditAction;
 import com.example.urlshortener.audit.repository.AuditRepository;
@@ -84,6 +85,9 @@ class ApiKeyIntegrationTests {
     private ClickEventRepository clickEventRepository;
 
     @Autowired
+    private LocalQueueClickEventPublisher clickAnalyticsPublisher;
+
+    @Autowired
     private AuditRepository auditRepository;
 
     @Autowired
@@ -103,6 +107,7 @@ class ApiKeyIntegrationTests {
 
     @BeforeEach
     void cleanDatabase() {
+        clickAnalyticsPublisher.flushOnce();
         idempotencyRecordRepository.deleteAll();
         auditRepository.deleteAll();
         apiKeyRepository.deleteAll();
