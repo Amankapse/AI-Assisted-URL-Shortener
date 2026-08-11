@@ -714,6 +714,8 @@ Outbox retry/replay/delete controls, API-key rotation/update, fabricated analyti
   - `git diff --check` passed; repository secret scan found no committed secrets; compiled frontend scan found only ordinary UI password-label text, not secret values.
   - k6 was unavailable locally, so no Stage 9D performance measurements were claimed.
   - Live backend health checks timed out from this execution environment; live frontend cookie/CSRF/reload smoke validation remains pending until the frontend Render Static Site URL is available and reachable in a browser.
+  - Follow-up CI correction: GitHub Actions exposed a brittle assertion in `OutboxRollbackIntegrationTests.outboxFailureRollsBackRequiredUrlMutationAndAudit`; the test expected one total audit row even though registration/workspace setup can legitimately create multiple non-URL audit rows. The test was edited to clean before execution, capture setup audit count, and assert the failed URL mutation adds no `URL_CREATED` audit row and no `short_urls` row.
+  - Follow-up validation: focused `.\mvnw.cmd -q "-Dtest=OutboxRollbackIntegrationTests" test` passed; full `.\mvnw.cmd clean verify` passed with 118 backend tests and JaCoCo line 85.11% / branch 60.78%.
 
 ## P-031 AI Output Examples
 

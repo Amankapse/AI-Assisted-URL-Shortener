@@ -4,6 +4,7 @@ import com.example.urlshortener.outbox.domain.DomainEvent;
 import com.example.urlshortener.outbox.domain.DomainEventPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -40,6 +41,11 @@ class OutboxRollbackIntegrationTests {
 
     @MockitoBean DomainEventPublisher domainEventPublisher;
 
+    @BeforeEach
+    void cleanBefore() {
+        clean();
+    }
+
     @AfterEach
     void clean() {
         jdbcTemplate.update("delete from outbox_events");
@@ -58,6 +64,7 @@ class OutboxRollbackIntegrationTests {
     void outboxFailureRollsBackRequiredUrlMutationAndAudit() throws Exception {
         doThrow(new IllegalStateException("outbox unavailable")).when(domainEventPublisher).publish(any(DomainEvent.class));
         String auth = registerAndLogin("owner@example.com");
+        long setupAuditEvents = count("audit_events");
 
         mockMvc.perform(post("/api/v1/urls")
                         .header(HttpHeaders.AUTHORIZATION, auth)
@@ -70,7 +77,8 @@ class OutboxRollbackIntegrationTests {
                 .andExpect(status().isInternalServerError());
 
         assertThat(count("short_urls")).isZero();
-        assertThat(count("audit_events")).isEqualTo(1);
+        assertThat(count("audit_events")).isEqualTo(setupAuditEvents);
+        assertThat(countUrlCreatedAuditEvents()).isZero();
     }
 
     private String registerAndLogin(String email) throws Exception {
@@ -88,5 +96,9 @@ class OutboxRollbackIntegrationTests {
 
     private long count(String table) {
         return jdbcTemplate.queryForObject("select count(*) from " + table, Long.class);
+    }
+
+    private long countUrlCreatedAuditEvents() {
+        return jdbcTemplate.queryForObject("select count(*) from audit_events where action = 'URL_CREATED'", Long.class);
     }
 }
