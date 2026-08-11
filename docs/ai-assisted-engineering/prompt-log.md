@@ -771,3 +771,36 @@ The earlier "separate Render Static Site" documentation was edited into a future
 ### Rejected
 
 A greedy catch-all SPA forward, wildcard CORS workaround, `SameSite=None`, hash routing, committed Angular `dist/`, backend migrations, and new UI/business features were rejected.
+
+## P-033 Stage 9D CI Test Isolation Correction
+
+- Scope: correct a CI-only `ApiKeyIntegrationTests` cleanup failure after the single-service packaging amendment.
+- Observed failure:
+  - GitHub Actions failed after `redirectEndpointIgnoresMalformedApiKeyHeader` with `fk_click_events_url` while deleting `short_urls`.
+  - The request itself returned the expected `302` redirect; the failure occurred during `@AfterEach` cleanup.
+- Root cause:
+  - Public redirect analytics are persisted asynchronously.
+  - `ApiKeyIntegrationTests.cleanDatabase()` deleted `click_events` before `short_urls`, but the analytics worker could persist a click event between those two deletes.
+- Correction:
+  - Injected `LocalQueueClickEventPublisher` into `ApiKeyIntegrationTests`.
+  - Called `flushOnce()` before deleting dependent rows so queued analytics are persisted before FK-ordered cleanup.
+  - No production code, migration, auth, API, Redis, datasource, or business logic changed.
+- Validation:
+  - `.\mvnw.cmd -q "-Dtest=ApiKeyIntegrationTests" test` passed.
+  - `.\mvnw.cmd clean verify` passed with 120 tests and JaCoCo line 85.13% / branch 60.90%.
+  - PostgreSQL and Redis Testcontainers started; Flyway V1-V10 validated/applied; Hibernate schema validation succeeded.
+  - `docker compose config` passed.
+
+## P-033 AI Output Examples
+
+### Accepted
+
+Flushing the existing local analytics publisher in test cleanup was accepted because it addresses the asynchronous FK race at the test boundary without changing production behavior.
+
+### Edited
+
+The initial diagnosis treated the delete order as suspicious, but the order was already correct. The final fix was edited to account for the async writer race.
+
+### Rejected
+
+Adding sleeps, disabling analytics globally, changing the `click_events` foreign key, adding cascade deletes, or weakening redirect analytics behavior were rejected as broader and less deterministic than the test cleanup fix.
