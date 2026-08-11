@@ -106,7 +106,7 @@ The application is a modular monolith to keep feature boundaries clear without a
 
 Detailed architecture is in [docs/architecture/architecture-overview.md](docs/architecture/architecture-overview.md) and [docs/architecture/transactional-outbox.md](docs/architecture/transactional-outbox.md).
 
-The Angular frontend is independently deployable and implements authenticated link management plus enterprise operations: runtime configuration, login/register, memory-only access-token state, refresh single-flight, CSRF propagation, workspace context propagation, guards, interceptors, URL dashboard, create flow, ETag-aware URL details editing, campaign management, URL analytics, audit trails, API-key lifecycle management, workspace/member management, platform analytics, moderation, admin audit, read-only outbox visibility, and Render Static Site deployment hardening. QR-code, custom-domain, and tracing UI work remain out of scope. See [docs/frontend/architecture.md](docs/frontend/architecture.md).
+The Angular frontend is source-separated and independently buildable, while the current Render demo packages the Angular build into the Spring Boot Docker image for one public URL. It implements authenticated link management plus enterprise operations: runtime configuration, login/register, memory-only access-token state, refresh single-flight, CSRF propagation, workspace context propagation, guards, interceptors, URL dashboard, create flow, ETag-aware URL details editing, campaign management, URL analytics, audit trails, API-key lifecycle management, workspace/member management, platform analytics, moderation, admin audit, and read-only outbox visibility. QR-code, custom-domain, and tracing UI work remain out of scope. See [docs/frontend/architecture.md](docs/frontend/architecture.md).
 
 # Prerequisites
 
@@ -543,16 +543,19 @@ npm test -- --watch=false
 npm run build
 ```
 
-Stage 9C frontend validation currently has 21 passing Angular unit tests.
+Stage 9D frontend validation currently has 22 passing Angular unit tests.
 
-Render Static Site frontend settings:
+Current Render deployment mode:
 
 ```text
-Root Directory: frontend
-Build Command: npm ci && npm run build:render
-Publish Directory: dist/frontend/browser
-Rewrite: /* -> /index.html
+Service Type: Web Service
+Environment: Docker
+Dockerfile: ./Dockerfile
+Health Check: /actuator/health/liveness
+URL: https://ai-url-shortener-682u.onrender.com
 ```
+
+The Docker build packages `frontend/dist/frontend/browser` into the Spring Boot JAR. `/`, `/login`, `/register`, and `/app/**` serve Angular; `/api/v1/**`, `/r/**`, `/actuator/**`, `/swagger-ui/**`, and `/v3/api-docs/**` remain backend routes.
 
 # Coverage
 

@@ -24,7 +24,7 @@ Use placeholders only in documentation and committed files. Configure real value
 | `APP_AUTH_ACCESS_TOKEN_TTL` | No | No | Access-token lifetime | `15m` |
 | `APP_AUTH_REFRESH_TOKEN_TTL` | No | No | Refresh-token lifetime | `14d` |
 | `APP_AUTH_SECURE_COOKIES` | Yes | No | Secure refresh-cookie flag for HTTPS production | `true` |
-| `APP_AUTH_ALLOWED_ORIGINS` | Yes | No | Explicit CORS allowlist | `https://<FRONTEND_DOMAIN>` |
+| `APP_AUTH_ALLOWED_ORIGINS` | Yes | No | Explicit CORS allowlist for external clients/future split frontend; same-origin Angular does not depend on CORS | `https://ai-url-shortener-682u.onrender.com` |
 | `APP_ANALYTICS_IP_HASH_PEPPER` | Yes | Yes | HMAC pepper for IP anonymization | `<STRONG_RANDOM_SECRET>` |
 | `APP_ANALYTICS_PUBLISHER` | No | No | Analytics publisher mode: `local` or `outbox`; defaults to `local` | `local` |
 | `APP_ANALYTICS_QUEUE_CAPACITY` | No | No | Analytics queue capacity | `1000` |
@@ -88,13 +88,13 @@ Use placeholders only in documentation and committed files. Configure real value
 | `SERVER_MAX_SWALLOW_SIZE` | No | No | Tomcat swallow size limit | `2MB` |
 | `JAVA_TOOL_OPTIONS` | No | No | JVM heap/GC options for small container | `-Xms64m -Xmx320m -XX:+UseG1GC` |
 
-## Frontend Static Site Public Variables
+## Frontend Public Build Variables
 
-These variables are used by `npm run build:render` to write `dist/frontend/browser/app-config.json`. They are browser-visible and must not contain secrets.
+These variables are used by `npm run build:render` to write `dist/frontend/browser/app-config.json` before the Angular files are packaged into the Spring Boot JAR. They are browser-visible and must not contain secrets.
 
 | Variable | Required | Secret | Purpose | Example |
 | --- | --- | --- | --- | --- |
-| `FRONTEND_API_BASE_URL` | Yes | No | Public Spring Boot API origin used by Angular `HttpClient` | `https://ai-url-shortener-682u.onrender.com` |
+| `FRONTEND_API_BASE_URL` | Yes | No | Public Spring Boot API origin used by Angular `HttpClient`; empty means same-origin `/api/v1/...` | empty string |
 | `FRONTEND_PUBLIC_SHORT_URL_BASE` | Yes | No | Public redirect base shown in frontend runtime config | `https://ai-url-shortener-682u.onrender.com` |
 | `FRONTEND_ENVIRONMENT` | No | No | Runtime environment label | `production` |
 

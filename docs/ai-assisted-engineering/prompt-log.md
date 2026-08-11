@@ -730,3 +730,44 @@ The deployment evidence was edited to avoid claiming live frontend cookie/CSRF v
 ### Rejected
 
 Changing refresh-cookie SameSite policy, loosening CSRF, switching Angular to hash routing, embedding Angular into Spring Boot, adding frontend telemetry SDKs, and adding backend migrations were rejected because Stage 9D is deployment compatibility and evidence only.
+
+## P-032 Stage 9D Amendment Single Render Web Service Packaging
+
+- Scope: package Angular and Spring Boot into one Render Web Service Docker image while preserving source separation under `frontend/` and `src/`.
+- Explicitly not started: QR codes, custom domains, tracing UI, Kafka/Kinesis/Pulsar, distributed KV, Redis Cluster code, Kubernetes manifests, billing, malware integration, new analytics dimensions, backend migrations, and business logic changes.
+- Implemented:
+  - Refactored `Dockerfile` into frontend build, backend build, and JRE runtime stages.
+  - Docker frontend stage runs `npm run build:render`; backend stage copies `frontend/dist/frontend/browser` into Spring Boot static resources before packaging the JAR.
+  - Runtime image contains only the JRE and `app.jar`.
+  - Added same-origin frontend runtime support: `apiBaseUrl: ""` resolves API calls to `/api/v1/...`.
+  - Added explicit Spring MVC SPA forwarding for `/`, `/login`, `/register`, `/app`, and `/app/**`.
+  - Updated Spring Security to permit SPA entry points and static assets while preserving backend authorization for `/api/v1/**`, `/r/**`, Actuator, Swagger, and OpenAPI.
+  - Added route-regression integration tests and frontend same-origin API-base tests.
+  - Updated CI to build the combined Docker image.
+  - Updated deployment, architecture, runbook, rollback, README, and release docs for the single-service deployment mode.
+- Validation:
+  - Focused SPA route test passed.
+  - Frontend tests passed with 22 Angular tests.
+  - `.\mvnw.cmd clean verify` passed with 120 backend tests and JaCoCo line 85.13% / branch 60.90%; PostgreSQL and Redis Testcontainers started; Flyway V1-V10 validated/applied; Hibernate schema validation succeeded.
+  - `.\mvnw.cmd dependency:tree` passed with no new production dependency.
+  - `docker compose config` passed.
+  - `npm run build` and `npm run build:render` passed with initial bundle 103.64 kB raw / 26.69 kB estimated transfer.
+  - `docker build -t url-shortener-fullstack .` passed; image size was 168,164,328 bytes.
+  - The packaged JAR contains `BOOT-INF/classes/static/index.html`, `app-config.json`, hashed JS, and CSS assets.
+  - Local packaged-image smoke with `PORT=10000` passed: Tomcat listened on port 10000, Docker exposed `0.0.0.0:18080->10000/tcp`, SPA routes served Angular, backend routes stayed excluded, liveness/readiness were healthy, Swagger UI/OpenAPI remained available, and the hashed Angular main JS asset loaded.
+  - `npm audit --audit-level=high` passed with only the known moderate Angular CLI dev-chain findings; forced remediation remains rejected because it would downgrade Angular CLI.
+  - `git diff --check` passed; repository and compiled frontend scans found no committed secret values.
+
+## P-032 AI Output Examples
+
+### Accepted
+
+The multi-stage Docker packaging, explicit SPA route forwarding, same-origin `apiBaseUrl: ""`, and route-exclusion tests were accepted because they meet the one-URL Render requirement without changing business logic.
+
+### Edited
+
+The earlier "separate Render Static Site" documentation was edited into a future split-deployment option. The MockMvc SPA test assertion was edited to assert the servlet forward target rather than rendered static content.
+
+### Rejected
+
+A greedy catch-all SPA forward, wildcard CORS workaround, `SameSite=None`, hash routing, committed Angular `dist/`, backend migrations, and new UI/business features were rejected.

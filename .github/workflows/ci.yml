@@ -56,6 +56,9 @@ jobs:
         working-directory: frontend
         run: npm audit --audit-level=high
 
+      - name: Build combined Docker image
+        run: docker build -t url-shortener-fullstack:ci .
+
       - name: Archive test reports
         if: always()
         uses: actions/upload-artifact@v4

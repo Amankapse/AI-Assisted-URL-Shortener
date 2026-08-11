@@ -86,6 +86,19 @@ describe('RuntimeConfigService', () => {
     expect(service.apiUrl('/api/v1/auth/me')).toBe('https://api.example.com/api/v1/auth/me');
   });
 
+  it('supports same-origin API base URLs', async () => {
+    const promise = service.load();
+    http.expectOne('/app-config.json').flush({
+      apiBaseUrl: '',
+      publicShortUrlBase: 'https://go.example.com',
+      environment: 'production'
+    });
+    await promise;
+
+    expect(service.apiUrl('/api/v1/auth/me')).toBe('/api/v1/auth/me');
+    expect(service.apiUrl('api/v1/urls')).toBe('/api/v1/urls');
+  });
+
   it('rejects malformed runtime configuration', async () => {
     const promise = service.load();
     http.expectOne('/app-config.json').flush({

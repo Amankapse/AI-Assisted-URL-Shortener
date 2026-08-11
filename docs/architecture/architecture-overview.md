@@ -60,15 +60,14 @@ The Render deployment is a live demonstration environment, not the hyperscale ta
 
 ```mermaid
 flowchart LR
-    Browser[Browser] --> StaticSite[Render Static Site<br/>Angular]
-    StaticSite --> Backend[Render Web Service<br/>Spring Boot]
+    Browser[Browser] --> Backend[Render Web Service<br/>Angular static assets + Spring Boot]
     Browser --> Redirects[Public /r/{shortCode}]
     Redirects --> Backend
     Backend --> Neon[(Neon PostgreSQL<br/>source of truth)]
     Backend --> Valkey[(Render Key Value / Valkey<br/>cache and rate limits)]
 ```
 
-Render Static Site hosts the Angular bundle and writes public runtime config during its build. The Spring Boot service reads production secrets from environment variables, runs Flyway on startup, validates the PostgreSQL schema with Hibernate, and keeps Redis/Valkey optional for redirect correctness.
+The Docker build keeps source code separated under `frontend/` and `src/`, builds Angular first, copies only `frontend/dist/frontend/browser` into Spring Boot static resources inside the image build, and packages one executable JAR. The Spring Boot service serves `/`, `/login`, `/register`, and `/app/**` as Angular SPA entry points while `/api/v1/**`, `/r/**`, `/actuator/**`, `/swagger-ui/**`, and `/v3/api-docs/**` remain backend routes. Production secrets are read at runtime from environment variables; frontend `app-config.json` contains only public browser-visible values.
 
 ## Production-scale architecture target
 

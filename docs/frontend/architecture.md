@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-The frontend is an independently deployable Angular 22 single-page application. It is not bundled into the Spring Boot JAR and communicates with the backend through typed API clients under `frontend/src/app/core/api`.
+The frontend is a source-separated Angular 22 single-page application under `frontend/` and communicates with the backend through typed API clients under `frontend/src/app/core/api`. The current Render demo packages the production Angular build into the Spring Boot JAR during the Docker build so one Web Service can serve both UI and API. The source architecture remains independent and can later split Angular back to CDN/static hosting through deployment/configuration changes.
 
 Stage 9 uses standalone components, route-level lazy loading, functional guards, functional interceptors, Reactive Forms, and Signals. Access tokens remain in memory only. Refresh tokens remain backend-owned `Secure`, `HttpOnly`, `SameSite=Strict` cookies.
 
@@ -22,7 +22,7 @@ Stage 9 uses standalone components, route-level lazy loading, functional guards,
 - `features/dashboard`: earlier workspace landing surface, no longer the primary authenticated route.
 - `layout`: authenticated app shell.
 
-Stage 9D adds Render Static Site deployment hardening and evidence. QR codes, custom domains, distributed tracing UI, and advanced charting remain out of scope.
+Stage 9D adds single-service Render deployment hardening and evidence. QR codes, custom domains, distributed tracing UI, and advanced charting remain out of scope.
 
 ## Link Management Contract
 

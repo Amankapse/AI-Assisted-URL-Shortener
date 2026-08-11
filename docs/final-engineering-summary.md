@@ -127,18 +127,19 @@ Final release validation includes:
 
 Final local results:
 
-- Backend tests: 118 passing
-- Frontend tests: 21 passing
+- Backend tests: 120 passing
+- Frontend tests: 22 passing
 - Line coverage: 85.11%
 - Branch coverage: 60.78%
 - Docker: PostgreSQL and Redis Testcontainers started successfully
 - Migrations: Flyway V1 through V10 validated and applied
 - Schema: Hibernate validation succeeded
 - Compose: `docker compose config` passed without warnings
-- Frontend build: Angular production build passed with 103.64 kB raw / 26.71 kB estimated transfer initial bundle
-- Render frontend build: `npm run build:render` generated public `app-config.json`
+- Frontend build: Angular production build passed with 103.64 kB raw / 26.69 kB estimated transfer initial bundle
+- Render full-stack build: Docker packages Angular `dist/frontend/browser` into the Spring Boot JAR for one Render Web Service; local packaged-image smoke confirmed SPA/backend route separation with `PORT=10000`
+- Render frontend config: `npm run build:render` generates public `app-config.json`; current same-origin deployment uses `apiBaseUrl: ""`
 
-The local environment did not have k6 installed, so no measured performance results are claimed. The GitHub Actions workflow is defined but must be verified remotely after the branch is pushed. Live frontend cookie/CSRF/reload smoke validation must be completed after a frontend Render Static Site URL is available.
+The local environment did not have k6 installed, so no measured performance results are claimed. The GitHub Actions workflow is defined but must be verified remotely after the branch is pushed. Live browser validation must confirm same-origin login, hard reload refresh restoration, CSRF-protected logout, and route refresh behavior after the combined image is deployed.
 
 ## Risks And Trade-Offs
 

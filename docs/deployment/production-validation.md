@@ -41,13 +41,16 @@ Check Render logs for:
 
 ## Frontend Checks
 
-For the Render Static Site:
+For the packaged single Web Service:
 
-- direct navigation to `/app/urls` returns Angular through the SPA rewrite;
-- direct navigation to `/app/audit`, `/app/api-keys`, and `/app/admin/outbox` returns Angular rather than a CDN 404;
+- `GET /` returns the Angular SPA instead of the previous backend `401`;
+- direct navigation to `/login`, `/register`, `/app/urls`, `/app/audit`, `/app/api-keys`, and `/app/admin/outbox` returns Angular;
+- `GET /api/v1/auth/me` remains a backend API/security response and is not forwarded to Angular;
+- `GET /r/<shortCode>` remains the backend redirect route;
+- `/actuator/health/liveness`, `/swagger-ui/index.html`, and `/v3/api-docs` remain backend routes;
 - `app-config.json` contains only public values: `apiBaseUrl`, `publicShortUrlBase`, and `environment`;
-- `apiBaseUrl` points to the public backend origin, not an internal Render URL;
-- static security/cache headers match [frontend-render.md](frontend-render.md).
+- `apiBaseUrl` is an empty string for same-origin `/api/v1/...` calls;
+- static security/cache headers are appropriate for the Spring Boot response path.
 
 ## Cookie And CSRF Checks
 
@@ -57,6 +60,6 @@ Validate in a browser:
 - hard reload attempts refresh and restores authenticated state;
 - logout sends `X-XSRF-TOKEN` and succeeds;
 - invalid/missing CSRF for refresh/logout is rejected;
-- CORS response allows the exact frontend origin and credentials.
+- same-origin Angular API calls do not require CORS.
 
-If `SameSite=Strict` prevents cross-subdomain refresh cookies from being sent between the frontend static site and backend service, stop and review the domain strategy. Do not switch to `SameSite=None` without explicit security approval.
+Keep refresh cookies `Secure`, `HttpOnly`, and `SameSite=Strict` for the same-origin Render deployment. Do not switch to `SameSite=None` unless a future split-host deployment receives explicit security approval.

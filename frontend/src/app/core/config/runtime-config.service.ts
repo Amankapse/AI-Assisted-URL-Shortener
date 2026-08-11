@@ -30,7 +30,7 @@ export class RuntimeConfigService {
   }
 
   private validate(config: Partial<AppConfig>): AppConfig {
-    if (!config.apiBaseUrl || !isHttpUrl(config.apiBaseUrl)) {
+    if (config.apiBaseUrl === undefined || config.apiBaseUrl === null || !isApiBaseUrl(config.apiBaseUrl)) {
       throw new Error('Runtime configuration requires a valid apiBaseUrl.');
     }
     if (!config.publicShortUrlBase || !isHttpUrl(config.publicShortUrlBase)) {
@@ -51,4 +51,8 @@ function isHttpUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function isApiBaseUrl(value: string): boolean {
+  return value === '' || isHttpUrl(value);
 }

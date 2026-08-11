@@ -10,15 +10,17 @@
 - [x] `cd frontend; npm run build`
 - [x] `cd frontend; npm audit --audit-level=moderate`
 - [x] `cd frontend; npm run build:render`
+- [x] `docker build -t url-shortener-fullstack .`
+- [x] local packaged-image route smoke with `PORT=10000`
 - [x] `git diff --check`
 - [x] repository secret scan
 
 ## Evidence
 
-- [x] Backend test count recorded: 118
-- [x] Frontend test count recorded: 21
-- [x] JaCoCo line/branch coverage recorded: 85.11% / 60.78%
-- [x] Angular bundle size recorded: 103.64 kB raw / 26.71 kB estimated transfer
+- [x] Backend test count recorded after amendment: 120
+- [x] Frontend test count recorded: 22
+- [x] JaCoCo line/branch coverage recorded: 85.13% / 60.90%
+- [x] Angular bundle size recorded: 103.64 kB raw / 26.69 kB estimated transfer
 - [x] Flyway V1-V10 validation recorded
 - [x] PostgreSQL Testcontainers evidence recorded
 - [x] Redis Testcontainers evidence recorded
@@ -28,17 +30,17 @@
 
 ## Deployment
 
-- [ ] Backend Render Web Service branch selected
-- [ ] Backend health check `/actuator/health/liveness`
+- [ ] Render Web Service branch selected
+- [ ] Render health check `/actuator/health/liveness`
 - [ ] Neon JDBC URL uses `sslmode=require`
 - [ ] Render Key Value internal URL configured
 - [ ] `APP_PUBLIC_BASE_URL` points to backend redirect base
-- [ ] `APP_AUTH_ALLOWED_ORIGINS` includes exact frontend origin
-- [x] Frontend Render Static Site root documented: `frontend`
-- [x] Frontend build command documented: `npm ci && npm run build:render`
-- [x] Frontend publish directory documented: `dist/frontend/browser`
-- [x] Static Site rewrite documented: `/* -> /index.html`
-- [x] Static Site security/cache headers documented
+- [ ] `APP_AUTH_ALLOWED_ORIGINS` remains explicit for external/future split clients
+- [x] Single Docker Web Service packaging documented
+- [x] Angular dist path documented: `frontend/dist/frontend/browser`
+- [x] SPA forwards documented for `/`, `/login`, `/register`, and `/app/**`
+- [x] Backend route exclusions documented for `/api`, `/r`, Actuator, Swagger, and OpenAPI
+- [x] Packaged image confirmed to serve SPA routes and backend routes separately in local smoke
 
 ## Security
 
@@ -56,8 +58,8 @@
 
 ## Operations
 
-- [ ] Liveness checked
-- [ ] Readiness checked
+- [x] Liveness checked in local packaged-image smoke
+- [x] Readiness checked in local packaged-image smoke
 - [ ] Redis degradation behavior documented
 - [ ] Neon outage behavior documented
 - [ ] Outbox status checked
