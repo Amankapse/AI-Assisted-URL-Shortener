@@ -1,0 +1,146 @@
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Link details</p>
+    <h1>{{ link()?.shortCode ?? 'Link' }}</h1>
+  </div>
+  <a class="secondary-action" routerLink="/app/urls">Back to links</a>
+</section>
+
+@if (loading()) {
+  <p class="loading">Loading link...</p>
+} @else if (problem(); as currentProblem) {
+  <app-error-state [problem]="currentProblem" />
+} @else if (link(); as current) {
+  <section class="summary">
+    <div>
+      <app-status-badge [state]="current.state" />
+      <p class="short-url">{{ current.shortUrl }}</p>
+      <p>{{ current.clickCount }} redirects · created {{ current.createdAt | date:'medium' }}</p>
+      <p>Expires {{ current.expiresAt | date:'medium' }}</p>
+    </div>
+    <div class="actions">
+      <app-copy-button [value]="current.shortUrl" label="Copy" />
+      <a class="primary-action" [href]="current.shortUrl" target="_blank" rel="noreferrer">Open</a>
+      <a class="secondary-action" [routerLink]="['/app/urls', current.id, 'analytics']">Analytics</a>
+      @if (ownerActionsAllowed()) {
+        @if (current.enabled) {
+          <button type="button" (click)="disable()" [disabled]="saving() === 'state'">Disable</button>
+        } @else {
+          <button type="button" (click)="enable()" [disabled]="saving() === 'state'">Enable</button>
+        }
+        <button type="button" class="danger" (click)="confirmDelete.set(true)" [disabled]="saving() === 'delete'">Delete</button>
+      } @else {
+        <span class="muted">Owner actions blocked by moderation</span>
+      }
+    </div>
+  </section>
+
+  @if (conflict(); as conflictProblem) {
+    <app-error-state [problem]="conflictProblem" />
+    <button type="button" class="secondary-action" (click)="load()">Reload latest</button>
+  }
+
+  <section class="editor-grid">
+    <form [formGroup]="destinationForm" (ngSubmit)="saveDestination()" class="panel">
+      <h2>Destination</h2>
+      <label>
+        URL
+        <input type="url" formControlName="originalUrl" />
+      </label>
+      <button type="submit" [disabled]="saving() === 'destination' || !ownerActionsAllowed()">Save destination</button>
+    </form>
+
+    <form [formGroup]="expirationForm" (ngSubmit)="saveExpiration()" class="panel">
+      <h2>Expiration</h2>
+      <label>
+        Expires at
+        <input type="datetime-local" formControlName="expiresAt" />
+      </label>
+      <button type="submit" [disabled]="saving() === 'expiration' || !ownerActionsAllowed()">Save expiration</button>
+    </form>
+
+    <form [formGroup]="campaignForm" (ngSubmit)="saveCampaign()" class="panel">
+      <h2>Campaign</h2>
+      <label>
+        Campaign
+        <select formControlName="campaignId">
+          <option value="">No campaign</option>
+          @for (campaign of campaigns(); track campaign.id) {
+            <option [value]="campaign.id">{{ campaign.name }}</option>
+          }
+        </select>
+      </label>
+      <button type="submit" [disabled]="saving() === 'campaign' || !ownerActionsAllowed()">Save campaign</button>
+    </form>
+
+    <section class="panel">
+      <h2>Tags</h2>
+      <div class="tag-entry">
+        <input
+          [formControl]="tagControl"
+          list="detailTagOptions"
+          placeholder="tag"
+          (keydown.enter)="$event.preventDefault(); addTag()"
+        />
+        <button type="button" (click)="addTag()" [disabled]="tags().length >= tagLimit || !ownerActionsAllowed()">Add</button>
+      </div>
+      <datalist id="detailTagOptions">
+        @for (tag of tagOptions(); track tag.id) {
+          <option [value]="tag.name"></option>
+        }
+      </datalist>
+      <div class="tags">
+        @for (tag of tags(); track tag) {
+          <app-tag-chip [tag]="tag" [removable]="ownerActionsAllowed()" (removed)="removeTag(tag)" />
+        }
+      </div>
+      <button type="button" (click)="saveTags()" [disabled]="saving() === 'tags' || !ownerActionsAllowed()">Save tags</button>
+    </section>
+  </section>
+
+  <section class="panel history">
+    <h2>URL audit history</h2>
+    @if (auditProblem(); as currentAuditProblem) {
+      <app-error-state [problem]="currentAuditProblem" (retry)="loadAudit()" />
+    } @else if (auditPage(); as history) {
+      @if (history.empty) {
+        <p class="muted">No audit history is available for this URL.</p>
+      } @else {
+        @for (event of history.content; track event.id) {
+          <article class="history-row">
+            <strong>{{ event.action }}</strong>
+            <span>{{ event.occurredAt | date:'medium' }}</span>
+            <span>{{ event.actorType }}</span>
+            @if (event.correlationId) {
+              <small>Correlation ID: {{ event.correlationId }}</small>
+            }
+            <div class="tags">
+              @for (entry of safeMetadataEntries(event); track entry.key) {
+                <span class="meta">{{ entry.key }}: {{ entry.value }}</span>
+              }
+            </div>
+          </article>
+        }
+        <app-pagination
+          [page]="history.number"
+          [totalPages]="history.totalPages"
+          [totalElements]="history.totalElements"
+          [pageSize]="history.size"
+          (pageChange)="loadAudit($event, history.size)"
+          (pageSizeChange)="loadAudit(0, $event)"
+        />
+      }
+    }
+  </section>
+} @else {
+  <app-empty-state title="Link not found" detail="The selected link is unavailable." />
+}
+
+<app-confirm-dialog
+  [open]="confirmDelete()"
+  title="Delete link"
+  description="This soft-deletes the link and stops redirects for it."
+  confirmLabel="Delete"
+  (confirmed)="deleteConfirmed()"
+  (cancelled)="confirmDelete.set(false)"
+/>

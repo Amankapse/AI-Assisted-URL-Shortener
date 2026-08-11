@@ -72,6 +72,24 @@ public class AppMetrics {
         increment("url_shortener.outbox." + operation, "eventType", eventType, "handler", handler, "outcome", outcome);
     }
 
+    public void campaign(String operation, String outcome) {
+        increment("url_shortener.campaigns", "operation", operation, "outcome", outcome);
+    }
+
+    public void tags(String operation, String outcome) {
+        increment("url_shortener.tags", "operation", operation, "outcome", outcome);
+    }
+
+    public void urlSearch(String outcome) {
+        increment("url_shortener.urls.search", "outcome", outcome);
+    }
+
+    public void recordUrlSearch(Timer.Sample sample, String outcome) {
+        sample.stop(Timer.builder("url_shortener.urls.search.latency")
+                .tags("outcome", outcome)
+                .register(registry));
+    }
+
     public Timer.Sample startTimer() {
         return Timer.start(registry);
     }

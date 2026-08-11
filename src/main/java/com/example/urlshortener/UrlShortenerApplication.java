@@ -9,6 +9,7 @@ import com.example.urlshortener.outbox.config.OutboxProperties;
 import com.example.urlshortener.redirect.config.RedirectCacheProperties;
 import com.example.urlshortener.url.config.AppUrlProperties;
 import com.example.urlshortener.url.config.ShortCodeProperties;
+import com.example.urlshortener.url.config.UrlOrganizationProperties;
 import com.example.urlshortener.url.config.UrlQuotaProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -21,6 +22,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         RedirectCacheProperties.class,
         AnalyticsProperties.class,
         AppUrlProperties.class,
+        UrlOrganizationProperties.class,
         IdempotencyProperties.class,
         RateLimitProperties.class,
         OutboxProperties.class,

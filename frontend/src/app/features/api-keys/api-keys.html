@@ -1,0 +1,75 @@
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Workspace credentials</p>
+    <h1>API keys</h1>
+  </div>
+</section>
+
+@if (rawCreatedKey(); as created) {
+  <section class="secret-panel" role="dialog" aria-labelledby="apiKeySecretTitle" aria-modal="true">
+    <h2 id="apiKeySecretTitle">Copy this API key now.</h2>
+    <p>It will not be shown again.</p>
+    <code>{{ created.rawKey }}</code>
+    <div class="actions">
+      <app-copy-button [value]="created.rawKey" label="Copy key" />
+      <button type="button" (click)="acknowledgeRawKey()">I have copied this key</button>
+    </div>
+  </section>
+}
+
+@if (problem(); as currentProblem) {
+  <app-error-state [problem]="currentProblem" (retry)="load()" />
+}
+
+<section class="layout">
+  <form [formGroup]="form" (ngSubmit)="create()" class="panel">
+    <h2>Create API key</h2>
+    @if (!canManage()) {
+      <p class="muted">Only workspace OWNER and ADMIN roles can manage API keys.</p>
+    }
+    <label>Name <input formControlName="name" [disabled]="!canManage()" /></label>
+    <label>Expiration <input type="datetime-local" formControlName="expiresAt" [disabled]="!canManage()" /></label>
+    <fieldset>
+      <legend>Scopes</legend>
+      <label><input type="checkbox" formControlName="linksRead" /> links:read</label>
+      <label><input type="checkbox" formControlName="linksWrite" /> links:write</label>
+      <label><input type="checkbox" formControlName="analyticsRead" /> analytics:read</label>
+    </fieldset>
+    <button type="submit" [disabled]="saving() || !canManage()">Create key</button>
+  </form>
+
+  <section class="panel">
+    <h2>Existing keys</h2>
+    @if (loading()) {
+      <p class="muted">Loading keys...</p>
+    } @else if (!keys().length) {
+      <app-empty-state title="No API keys" detail="Create a key for machine-to-machine access when needed." />
+    } @else {
+      <div class="key-list">
+        @for (key of keys(); track key.id) {
+          <article class="key-row">
+            <div>
+              <h3>{{ key.name }}</h3>
+              <p>Prefix {{ key.prefix }} · {{ key.scopes.join(', ') }}</p>
+              <p>Created {{ key.createdAt | date:'medium' }} · Expires {{ key.expiresAt ? (key.expiresAt | date:'medium') : 'never' }}</p>
+              <p>Last used {{ key.lastUsedAt ? (key.lastUsedAt | date:'medium') : 'never' }}</p>
+              @if (key.revokedAt) {
+                <strong>Revoked {{ key.revokedAt | date:'medium' }}</strong>
+              }
+            </div>
+            <button type="button" class="danger" (click)="confirmRevoke.set(key)" [disabled]="!!key.revokedAt || !canManage()">Revoke</button>
+          </article>
+        }
+      </div>
+    }
+  </section>
+</section>
+
+<app-confirm-dialog
+  [open]="!!confirmRevoke()"
+  title="Revoke API key"
+  description="Applications using this key will immediately lose access."
+  confirmLabel="Revoke"
+  (confirmed)="revokeConfirmed()"
+  (cancelled)="confirmRevoke.set(null)"
+/>

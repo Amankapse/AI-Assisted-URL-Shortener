@@ -1,0 +1,55 @@
+.badge {
+  align-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.85rem;
+  font-weight: 700;
+  gap: 0.35rem;
+  line-height: 1;
+  padding: 0.35rem 0.55rem;
+  white-space: nowrap;
+}
+
+.badge span {
+  border-radius: 999px;
+  display: inline-block;
+  height: 0.55rem;
+  width: 0.55rem;
+}
+
+.success {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.success span {
+  background: #10b981;
+}
+
+.muted {
+  background: #f8fafc;
+  color: #475569;
+}
+
+.muted span {
+  background: #94a3b8;
+}
+
+.danger {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.danger span {
+  background: #dc2626;
+}
+
+.warning {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.warning span {
+  background: #f59e0b;
+}

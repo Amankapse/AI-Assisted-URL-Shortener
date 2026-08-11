@@ -81,10 +81,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/audit/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/outbox/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/admin/urls/{id}/block", "/api/v1/admin/urls/{id}/unblock").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/campaigns/**", "/api/v1/workspaces/{workspaceId}/tags/**").hasAnyAuthority("ROLE_USER", "SCOPE_links:read", "SCOPE_links:write")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/workspaces/{workspaceId}/campaigns/**").hasRole("USER")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/workspaces/{workspaceId}/campaigns/**").hasRole("USER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/workspaces/{workspaceId}/campaigns/**").hasRole("USER")
                         .requestMatchers("/api/v1/auth/me", "/api/v1/workspaces/**").hasRole("USER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/urls/{id}/analytics", "/api/v1/urls/{id}/analytics/daily").hasAnyAuthority("ROLE_USER", "SCOPE_analytics:read")
                         .requestMatchers(HttpMethod.GET, "/api/v1/urls/**").hasAnyAuthority("ROLE_USER", "SCOPE_links:read", "SCOPE_links:write")
                         .requestMatchers(HttpMethod.POST, "/api/v1/urls/**").hasAnyAuthority("ROLE_USER", "SCOPE_links:write")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/urls/**").hasAnyAuthority("ROLE_USER", "SCOPE_links:write")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/urls/**").hasAnyAuthority("ROLE_USER", "SCOPE_links:write")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/urls/**").hasAnyAuthority("ROLE_USER", "SCOPE_links:write")
                         .anyRequest().denyAll());
@@ -95,7 +100,7 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource(AuthProperties properties) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(properties.getAllowedOrigins());
-        configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, "X-XSRF-TOKEN", "X-Correlation-ID", "X-Workspace-ID", "X-API-Key", "Idempotency-Key", HttpHeaders.IF_MATCH));
         configuration.setExposedHeaders(List.of("XSRF-TOKEN"));
         configuration.setAllowCredentials(true);

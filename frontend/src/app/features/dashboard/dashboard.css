@@ -1,0 +1,35 @@
+.dashboard {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.eyebrow {
+  color: #0f766e;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+  text-transform: uppercase;
+}
+
+h1 {
+  font-size: 2rem;
+  margin: 0;
+}
+
+.summary {
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 0.3rem;
+  max-width: 30rem;
+  padding: 1rem;
+}
+
+.summary span,
+.summary small,
+.empty {
+  color: #475569;
+}
+
+.summary strong {
+  font-size: 1.2rem;
+}

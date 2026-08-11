@@ -1,0 +1,35 @@
+<section class="page-header">
+  <div><p class="eyebrow">Platform</p><h1>Overview</h1></div>
+  <nav>
+    <a routerLink="/app/admin/moderation">Moderation</a>
+    <a routerLink="/app/admin/audit">Audit</a>
+    <a routerLink="/app/admin/outbox">Outbox</a>
+  </nav>
+</section>
+
+@if (loading()) {
+  <p class="muted">Loading platform overview...</p>
+} @else if (problem(); as currentProblem) {
+  <app-error-state [problem]="currentProblem" (retry)="load()" />
+} @else if (overview(); as current) {
+  <section class="kpis">
+    <article><span>Users</span><strong>{{ current.totalUsers }}</strong></article>
+    <article><span>Links</span><strong>{{ current.totalLinks }}</strong></article>
+    <article><span>Active</span><strong>{{ current.activeLinks }}</strong></article>
+    <article><span>Disabled</span><strong>{{ current.disabledLinks }}</strong></article>
+    <article><span>Expired</span><strong>{{ current.expiredLinks }}</strong></article>
+    <article><span>Redirects</span><strong>{{ current.totalRedirects }}</strong></article>
+  </section>
+
+  <section class="panel">
+    <h2>Top links</h2>
+    <table>
+      <thead><tr><th>Short code</th><th>Redirects</th></tr></thead>
+      <tbody>
+        @for (link of topLinks(); track link.shortCode) {
+          <tr><td>{{ link.shortCode }}</td><td>{{ link.redirects }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </section>
+}

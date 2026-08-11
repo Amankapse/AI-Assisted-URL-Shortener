@@ -87,3 +87,15 @@ Use placeholders only in documentation and committed files. Configure real value
 | `SERVER_MAX_HTTP_FORM_POST_SIZE` | No | No | Tomcat form body limit | `2MB` |
 | `SERVER_MAX_SWALLOW_SIZE` | No | No | Tomcat swallow size limit | `2MB` |
 | `JAVA_TOOL_OPTIONS` | No | No | JVM heap/GC options for small container | `-Xms64m -Xmx320m -XX:+UseG1GC` |
+
+## Frontend Static Site Public Variables
+
+These variables are used by `npm run build:render` to write `dist/frontend/browser/app-config.json`. They are browser-visible and must not contain secrets.
+
+| Variable | Required | Secret | Purpose | Example |
+| --- | --- | --- | --- | --- |
+| `FRONTEND_API_BASE_URL` | Yes | No | Public Spring Boot API origin used by Angular `HttpClient` | `https://ai-url-shortener-682u.onrender.com` |
+| `FRONTEND_PUBLIC_SHORT_URL_BASE` | Yes | No | Public redirect base shown in frontend runtime config | `https://ai-url-shortener-682u.onrender.com` |
+| `FRONTEND_ENVIRONMENT` | No | No | Runtime environment label | `production` |
+
+`APP_PUBLIC_BASE_URL` belongs to the backend and controls generated `shortUrl` values. Keep it pointed at the backend redirect origin while redirects are served by `/r/{shortCode}` on the Spring Boot service.

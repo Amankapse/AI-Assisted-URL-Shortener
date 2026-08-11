@@ -1,6 +1,6 @@
 # Render Deployment
 
-## Web Service
+## Backend Web Service
 
 1. Create or sign in to a Render account.
 2. Connect the GitHub repository.
@@ -14,6 +14,14 @@
 10. Deploy and inspect startup logs.
 
 Render provides `PORT`. The application maps this through `server.port=${PORT:8080}` and does not bind to `localhost` or `127.0.0.1`.
+
+The current live backend URL is:
+
+```text
+https://ai-url-shortener-682u.onrender.com
+```
+
+Keep `APP_PUBLIC_BASE_URL` set to this backend origin while public redirects continue to be served by `/r/{shortCode}` on the Spring Boot application.
 
 ## Runtime Profile
 
@@ -45,3 +53,14 @@ JAVA_TOOL_OPTIONS=-Xms64m -Xmx320m -XX:+UseG1GC
 
 Tune only after observing memory, latency, and garbage-collection behavior.
 
+## Frontend Static Site
+
+Deploy the Angular app as a separate Render Static Site. Use:
+
+```text
+Root Directory: frontend
+Build Command: npm ci && npm run build:render
+Publish Directory: dist/frontend/browser
+```
+
+Configure a SPA rewrite from `/*` to `/index.html`. See [frontend-render.md](frontend-render.md).

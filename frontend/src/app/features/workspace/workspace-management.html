@@ -1,0 +1,85 @@
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Workspace</p>
+    <h1>{{ selectedWorkspace()?.name ?? 'Workspace' }}</h1>
+    <p class="muted">Current role: {{ selectedWorkspace()?.role ?? 'none' }}</p>
+  </div>
+</section>
+
+@if (problem(); as currentProblem) {
+  <app-error-state [problem]="currentProblem" (retry)="loadMembers()" />
+}
+
+<section class="layout">
+  <section class="panel">
+    <h2>Your workspaces</h2>
+    @for (workspace of workspaces(); track workspace.id) {
+      <p>{{ workspaceLabel(workspace) }} @if (workspace.defaultWorkspace) { <span class="badge">Default</span> }</p>
+    }
+    <form [formGroup]="workspaceForm" (ngSubmit)="createWorkspace()" class="stack">
+      <h3>Create workspace</h3>
+      <label>Name <input formControlName="name" /></label>
+      <button type="submit" [disabled]="saving()">Create workspace</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Members</h2>
+    @if (!canManage()) {
+      <p class="muted">Only workspace OWNER and ADMIN roles can manage members.</p>
+    }
+    <form [formGroup]="memberForm" (ngSubmit)="addMember()" class="member-form">
+      <label>Email <input type="email" formControlName="email" [disabled]="!canManage()" /></label>
+      <label>
+        Role
+        <select formControlName="role" [disabled]="!canManage()">
+          @for (role of roles; track role) {
+            <option [value]="role">{{ role }}</option>
+          }
+        </select>
+      </label>
+      <button type="submit" [disabled]="saving() || !canManage()">Add member</button>
+    </form>
+
+    @if (loading()) {
+      <p class="muted">Loading members...</p>
+    } @else if (!members().length) {
+      <app-empty-state title="No members" detail="Members will appear when this workspace has collaborators." />
+    } @else {
+      <div class="member-list">
+        @for (member of members(); track member.userId) {
+          <article class="member-row">
+            <div>
+              <strong>{{ member.email }}</strong>
+              <p>{{ member.userId }} @if (member.defaultMembership) { <span class="badge">Default</span> }</p>
+            </div>
+            <select [value]="member.role" (change)="requestRoleChange(member, $any($event.target).value)" [disabled]="!canManage() || saving()">
+              @for (role of roles; track role) {
+                <option [value]="role">{{ role }}</option>
+              }
+            </select>
+            <button type="button" class="danger" (click)="confirmRemove.set(member)" [disabled]="!canManage() || saving()">Remove</button>
+          </article>
+        }
+      </div>
+    }
+  </section>
+</section>
+
+<app-confirm-dialog
+  [open]="!!confirmRemove()"
+  title="Remove member"
+  description="This user will immediately lose access to the selected workspace."
+  confirmLabel="Remove"
+  (confirmed)="removeConfirmed()"
+  (cancelled)="confirmRemove.set(null)"
+/>
+
+<app-confirm-dialog
+  [open]="!!confirmDemote()"
+  title="Change privileged role"
+  description="This reduces a privileged workspace role. Backend rules still protect required owner invariants."
+  confirmLabel="Change role"
+  (confirmed)="confirmDemote() && updateRole(confirmDemote()!.member, confirmDemote()!.role)"
+  (cancelled)="confirmDemote.set(null)"
+/>

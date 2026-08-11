@@ -119,7 +119,7 @@ Final release validation includes:
 - `docker compose config`
 - PostgreSQL Testcontainers
 - Redis Testcontainers
-- Flyway V1 through V9 validation and application
+- Flyway V1 through V10 validation and application
 - Hibernate schema validation
 - JaCoCo coverage report generation
 - GitHub Actions workflow definition
@@ -127,15 +127,18 @@ Final release validation includes:
 
 Final local results:
 
-- Tests: 113 passing
-- Line coverage: 85.15%
-- Branch coverage: 60.53%
+- Backend tests: 118 passing
+- Frontend tests: 21 passing
+- Line coverage: 85.11%
+- Branch coverage: 60.78%
 - Docker: PostgreSQL and Redis Testcontainers started successfully
-- Migrations: Flyway V1 through V9 validated and applied
+- Migrations: Flyway V1 through V10 validated and applied
 - Schema: Hibernate validation succeeded
 - Compose: `docker compose config` passed without warnings
+- Frontend build: Angular production build passed with 103.64 kB raw / 26.71 kB estimated transfer initial bundle
+- Render frontend build: `npm run build:render` generated public `app-config.json`
 
-The local environment did not have k6 installed, so no measured performance results are claimed. The GitHub Actions workflow is defined but must be verified remotely after the branch is pushed.
+The local environment did not have k6 installed, so no measured performance results are claimed. The GitHub Actions workflow is defined but must be verified remotely after the branch is pushed. Live frontend cookie/CSRF/reload smoke validation must be completed after a frontend Render Static Site URL is available.
 
 ## Risks And Trade-Offs
 

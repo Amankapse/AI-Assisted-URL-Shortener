@@ -33,6 +33,29 @@ jobs:
       - name: Validate Docker Compose
         run: docker compose config
 
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Test frontend
+        working-directory: frontend
+        run: npm test -- --watch=false
+
+      - name: Audit frontend production-relevant dependency risk
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
       - name: Archive test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -46,3 +69,10 @@ jobs:
         with:
           name: jacoco-report
           path: target/site/jacoco/
+
+      - name: Archive frontend production build
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/

@@ -108,6 +108,14 @@ app:
     max-payload-bytes: ${APP_OUTBOX_MAX_PAYLOAD_BYTES:8192}
     shutdown-grace-period: ${APP_OUTBOX_SHUTDOWN_GRACE_PERIOD:10s}
     metrics-refresh-interval: ${APP_OUTBOX_METRICS_REFRESH_INTERVAL:30s}
+  url-organization:
+    tag-max-length: ${APP_TAG_MAX_LENGTH:50}
+    tags-per-url: ${APP_TAGS_PER_URL:10}
+    campaign-name-max-length: ${APP_CAMPAIGN_NAME_MAX_LENGTH:120}
+    campaign-description-max-length: ${APP_CAMPAIGN_DESCRIPTION_MAX_LENGTH:500}
+    search-query-max-length: ${APP_SEARCH_QUERY_MAX_LENGTH:100}
+    default-page-size: ${APP_URL_SEARCH_DEFAULT_PAGE_SIZE:20}
+    max-page-size: ${APP_URL_SEARCH_MAX_PAGE_SIZE:100}
   rate-limit:
     enabled: ${APP_RATE_LIMIT_ENABLED:true}
     key-salt: ${APP_RATE_LIMIT_KEY_SALT:local-development-rate-limit-salt}

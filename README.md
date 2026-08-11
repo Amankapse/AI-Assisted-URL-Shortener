@@ -12,6 +12,7 @@ This repository contains a production-oriented URL shortener implemented with Ja
 - Immutable application-level audit trail for enterprise mutations
 - Workspace-bound machine API keys with scoped access
 - Transactional outbox for durable URL mutation, cache invalidation, and optional analytics delivery
+- Workspace campaigns, normalized tags, and bounded URL search/filtering
 - RS256 JWT access tokens
 - Rotating opaque refresh tokens stored only as SHA-256 digests
 - Refresh-token reuse detection and token-family revocation
@@ -42,6 +43,7 @@ This repository contains a production-oriented URL shortener implemented with Ja
 - GitHub Actions CI workflow
 - JaCoCo coverage reporting
 - k6 performance scripts
+- Angular 22 frontend with runtime config, auth, workspace shell, link management, analytics, audit, API keys, workspace management, and platform operations
 
 ## Technology Stack
 
@@ -62,6 +64,8 @@ This repository contains a production-oriented URL shortener implemented with Ja
 | Mockito | 5.17.0 via Spring Boot test |
 | Testcontainers | 1.21.0 via Spring Boot dependency management |
 | Docker | Docker Desktop/Engine required; local validation used Docker server 29.6.1 |
+| Frontend | Angular 22.1.3, TypeScript 6.0.2, RxJS 7.8, Angular CLI build/test tooling |
+| Node/npm | Local validation used Node 24.18.0 and npm 11.16.0 |
 | GitHub Actions | `.github/workflows/ci.yml` |
 | JaCoCo | 0.8.12 Maven plugin |
 | k6 | Scripts in `performance/k6/`; local execution was not performed because k6 was unavailable |
@@ -70,7 +74,8 @@ This repository contains a production-oriented URL shortener implemented with Ja
 
 ```mermaid
 flowchart TB
-    Client[Client / Browser / API Consumer] --> App[Spring Boot Modular Monolith]
+    Browser[Angular SPA / Browser] --> App[Spring Boot Modular Monolith]
+    Client[API Consumer] --> App
     App --> Security[Security: JWT, API Keys, CSRF, CORS, Workspace RBAC]
     App --> Auth[Auth Module]
     App --> Workspaces[Workspace/Tenant Module]
@@ -94,11 +99,14 @@ flowchart TB
     Outbox --> Redis
     RateLimit --> Redis
     Observability --> Metrics[Operational Metrics]
+    Browser --> RuntimeConfig[Runtime app-config.json]
 ```
 
 The application is a modular monolith to keep feature boundaries clear without adding distributed-system complexity. PostgreSQL is the source of truth for users, workspaces, memberships, URLs, refresh-token digests, API-key digests, analytics, and audit events. Redis is an optimization for redirect cache-aside and rate limiting; redirect correctness falls back to PostgreSQL when Redis is unavailable. Analytics are asynchronous and best-effort so redirect latency remains protected. Audit writes are synchronous in the same database transaction as the business mutation where practical. Tenant access is derived from workspace membership for humans and workspace-bound API-key scopes for machines.
 
 Detailed architecture is in [docs/architecture/architecture-overview.md](docs/architecture/architecture-overview.md) and [docs/architecture/transactional-outbox.md](docs/architecture/transactional-outbox.md).
+
+The Angular frontend is independently deployable and implements authenticated link management plus enterprise operations: runtime configuration, login/register, memory-only access-token state, refresh single-flight, CSRF propagation, workspace context propagation, guards, interceptors, URL dashboard, create flow, ETag-aware URL details editing, campaign management, URL analytics, audit trails, API-key lifecycle management, workspace/member management, platform analytics, moderation, admin audit, read-only outbox visibility, and Render Static Site deployment hardening. QR-code, custom-domain, and tracing UI work remain out of scope. See [docs/frontend/architecture.md](docs/frontend/architecture.md).
 
 # Prerequisites
 
@@ -110,6 +118,7 @@ Docker must be running because integration tests start PostgreSQL and Redis thro
 | Java 21 JDK | `java -version` |
 | Docker Desktop / Docker Engine | `docker --version` |
 | Docker Compose | `docker compose version` |
+| Node.js 24 and npm 11 | `node -v` and `npm -v`; required for the Angular frontend |
 | Maven | Maven wrapper is included; separate Maven install is not required |
 | PowerShell | Required for Windows commands |
 | Bash | Required for Unix/macOS commands and `scripts/verify.sh` |
@@ -293,6 +302,16 @@ Invoke-RestMethod http://localhost:8080/actuator/health/readiness
 http://localhost:8080/swagger-ui.html
 ```
 
+8. Start the Angular frontend in another terminal:
+
+```powershell
+cd frontend
+npm ci
+npm start
+```
+
+The default frontend runtime config points at `http://localhost:8080`.
+
 ## Unix/macOS
 
 ```bash
@@ -322,6 +341,14 @@ export APP_AUTH_SECURE_COOKIES=false
 export APP_ANALYTICS_IP_HASH_PEPPER=local-development-only-change-me
 export APP_RATE_LIMIT_KEY_SALT=local-development-rate-limit-salt
 ./mvnw spring-boot:run
+```
+
+In another terminal:
+
+```bash
+cd frontend
+npm ci
+npm start
 ```
 
 ## Docker Startup
@@ -449,6 +476,7 @@ Flyway runs automatically on application startup. PostgreSQL is authoritative an
 | `V7__audit_events.sql` | Immutable application-level audit events with bounded JSONB metadata |
 | `V8__api_keys.sql` | Workspace-bound API keys and API-key audit actions |
 | `V9__outbox_events.sql` | Transactional outbox events, claim/retry fields, and dispatch indexes |
+| `V10__campaigns_tags_and_search.sql` | Campaigns, tags, URL tag assignments, nullable campaign assignment, destination host search support, and audit enum expansion |
 
 Migration files are in `src/main/resources/db/migration/`.
 
@@ -505,14 +533,33 @@ Unix/macOS:
 ./mvnw clean verify
 ```
 
-The verified suite count is recorded in [docs/testing/test-strategy.md](docs/testing/test-strategy.md). The build starts PostgreSQL and Redis Testcontainers automatically, runs Flyway migrations, validates Hibernate schema mappings, executes unit/integration/security/operation tests, builds the jar, and generates JaCoCo coverage.
+The verified backend suite count is recorded in [docs/testing/test-strategy.md](docs/testing/test-strategy.md). The backend build starts PostgreSQL and Redis Testcontainers automatically, runs Flyway migrations, validates Hibernate schema mappings, executes unit/integration/security/operation tests, builds the jar, and generates JaCoCo coverage.
+
+Frontend:
+
+```powershell
+cd frontend
+npm test -- --watch=false
+npm run build
+```
+
+Stage 9C frontend validation currently has 21 passing Angular unit tests.
+
+Render Static Site frontend settings:
+
+```text
+Root Directory: frontend
+Build Command: npm ci && npm run build:render
+Publish Directory: dist/frontend/browser
+Rewrite: /* -> /index.html
+```
 
 # Coverage
 
 Current JaCoCo results:
 
-- Line coverage: 85.15%
-- Branch coverage: 60.53%
+- Line coverage: 85.11%
+- Branch coverage: 60.78%
 - Report: `target/site/jacoco/index.html`
 
 Coverage is quality evidence, not proof of correctness. See [docs/testing/coverage-summary.md](docs/testing/coverage-summary.md).
@@ -524,6 +571,10 @@ k6 scripts are provided in `performance/k6/`:
 - `redirect-cache-hit.js`
 - `redirect-cache-miss.js`
 - `url-create.js`
+- `url-list.js`
+- `url-search.js`
+- `campaign-filter.js`
+- `tag-filter.js`
 - `login.js`
 - `user-analytics.js`
 - `admin-analytics.js`
@@ -551,6 +602,9 @@ The workflow:
 - generates JaCoCo coverage
 - uploads test and coverage artifacts
 - validates Docker Compose configuration
+- configures Node.js 24
+- runs `npm ci`, `npm run build`, and `npm test -- --watch=false` in `frontend/`
+- uploads the Angular production build artifact
 
 Remote CI status is not claimed until the workflow runs on GitHub after push.
 
@@ -659,8 +713,12 @@ src/
     java/          Spring Boot application modules
     resources/     application config and Flyway migrations
   test/            unit, integration, security, and operation tests
+frontend/
+  src/app/         Angular 22 frontend auth, link management, and operations UI
+  public/          runtime app-config.json
 docs/
   architecture/    architecture overview, diagrams, ADRs
+  frontend/        Angular architecture, auth, config, deployment, security, testing, flows
   security/        authentication notes and threat model
   testing/         test strategy, coverage, performance, quality review
   operations/      runbook and rollback guide
@@ -727,6 +785,18 @@ performance/
 | [Rollback guide](docs/operations/rollback.md) | Rollback policy |
 | [Observability](docs/architecture/observability.md) | Health/readiness/metrics |
 | [Rate limiting](docs/architecture/rate-limiting.md) | Limiter policies and failure behavior |
+
+## Frontend
+
+| Document | Purpose |
+| --- | --- |
+| [Frontend architecture](docs/frontend/architecture.md) | Angular module boundaries and Stage 9C scope |
+| [Frontend authentication](docs/frontend/authentication.md) | Memory-only access tokens, refresh, CSRF |
+| [Runtime configuration](docs/frontend/runtime-configuration.md) | `app-config.json` contract |
+| [Frontend deployment](docs/frontend/deployment.md) | Static hosting guidance |
+| [Frontend security](docs/frontend/security.md) | Browser security controls and CSP |
+| [Frontend testing](docs/frontend/testing.md) | Angular test coverage |
+| [User flows](docs/frontend/user-flows.md) | Auth, link-management, and operations flows |
 
 ## AI-Assisted Engineering
 

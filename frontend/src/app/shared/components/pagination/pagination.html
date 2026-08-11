@@ -1,0 +1,15 @@
+<nav class="pagination" aria-label="Pagination">
+  <span>Page {{ page() + 1 }} of {{ totalPages() || 1 }} · {{ totalElements() }} links</span>
+  <div>
+    <label>
+      Page size
+      <select [value]="pageSize()" (change)="pageSizeChange.emit(+$any($event.target).value)">
+        @for (size of sizes; track size) {
+          <option [value]="size">{{ size }}</option>
+        }
+      </select>
+    </label>
+    <button type="button" [disabled]="page() <= 0" (click)="pageChange.emit(page() - 1)">Previous</button>
+    <button type="button" [disabled]="page() + 1 >= totalPages()" (click)="pageChange.emit(page() + 1)">Next</button>
+  </div>
+</nav>

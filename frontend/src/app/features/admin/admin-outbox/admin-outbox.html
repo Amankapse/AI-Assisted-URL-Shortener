@@ -1,0 +1,33 @@
+<section class="page-header"><p class="eyebrow">Platform</p><h1>Outbox</h1><p class="muted">Read-only operational visibility. Retry, replay and delete actions are intentionally not available.</p></section>
+<form [formGroup]="filters" class="filters">
+  <label>Status <select formControlName="status"><option value="">Any</option>@for (status of statuses; track status) { <option [value]="status">{{ status }}</option> }</select></label>
+  <label>Event type <select formControlName="eventType"><option value="">Any</option>@for (type of eventTypes; track type) { <option [value]="type">{{ type }}</option> }</select></label>
+  <label>From <input type="datetime-local" formControlName="from" /></label>
+  <label>To <input type="datetime-local" formControlName="to" /></label>
+  <label>Size <select formControlName="size"><option [value]="10">10</option><option [value]="20">20</option><option [value]="50">50</option><option [value]="100">100</option></select></label>
+</form>
+@if (loading()) { <p class="muted">Loading outbox events...</p> }
+@else if (problem(); as currentProblem) { <app-error-state [problem]="currentProblem" (retry)="load()" /> }
+@else if (result(); as page) {
+  @if (!page.content.length) { <app-empty-state title="No outbox events" detail="No events match the current filters." /> }
+  @else {
+    <div class="outbox-list">
+      @for (event of page.content; track trackEvent(event)) {
+        <article class="outbox-row">
+          <strong>{{ event.eventType }}</strong>
+          <span>Status: {{ event.status }} · Attempts: {{ event.attemptCount }}</span>
+          <span>Aggregate: {{ event.aggregateType }} · Version: {{ event.eventVersion }}</span>
+          <span>Created {{ event.createdAt | date:'medium' }}</span>
+          <span>Next {{ event.nextAttemptAt ? (event.nextAttemptAt | date:'medium') : 'none' }} · Processed {{ event.processedAt ? (event.processedAt | date:'medium') : 'not processed' }}</span>
+          @if (event.lastErrorCode) { <span>Error code: {{ event.lastErrorCode }}</span> }
+          <code>{{ event.eventId }}</code>
+        </article>
+      }
+    </div>
+    <nav class="pager" aria-label="Outbox pagination">
+      <button type="button" [disabled]="page.page <= 0" (click)="load(page.page - 1)">Previous</button>
+      <span>Page {{ page.page + 1 }}</span>
+      <button type="button" [disabled]="page.content.length < page.size" (click)="load(page.page + 1)">Next</button>
+    </nav>
+  }
+}

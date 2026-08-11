@@ -1,0 +1,35 @@
+<header class="topbar">
+  <a class="brand" routerLink="/app/urls">Shortener Ops</a>
+  @if (authState.user(); as user) {
+    <div class="session">
+      <nav aria-label="Primary navigation">
+        <a routerLink="/app/urls" routerLinkActive="active">Links</a>
+        <a routerLink="/app/campaigns" routerLinkActive="active">Campaigns</a>
+        <a routerLink="/app/audit" routerLinkActive="active">Audit</a>
+        <a routerLink="/app/api-keys" routerLinkActive="active">API Keys</a>
+        <a routerLink="/app/workspace" routerLinkActive="active">Workspace</a>
+        @if (authState.isAdmin()) {
+          <a routerLink="/app/admin/overview" routerLinkActive="active">Platform</a>
+        }
+      </nav>
+      <select
+        aria-label="Current workspace"
+        [disabled]="workspaceState.loading()"
+        [value]="workspaceState.selectedWorkspaceId() ?? ''"
+        (change)="workspaceState.select($any($event.target).value)"
+      >
+        @for (workspace of workspaceState.workspaces(); track workspace.id) {
+          <option [value]="workspace.id">{{ workspace.name }} ({{ workspace.role }})</option>
+        }
+      </select>
+      <span>{{ user.email }}</span>
+      <button type="button" (click)="auth.logout().subscribe()">Sign out</button>
+    </div>
+  }
+</header>
+
+<main class="shell-main">
+  <router-outlet />
+</main>
+
+<app-notification-center />

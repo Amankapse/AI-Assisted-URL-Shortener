@@ -1,5 +1,6 @@
 package com.example.urlshortener.url.service;
 
+import com.example.urlshortener.campaign.repository.CampaignRepository;
 import com.example.urlshortener.audit.service.AuditService;
 import com.example.urlshortener.audit.entity.AuditActorType;
 import com.example.urlshortener.common.exception.BadRequestException;
@@ -8,6 +9,7 @@ import com.example.urlshortener.common.exception.ResourceNotFoundException;
 import com.example.urlshortener.common.metrics.AppMetrics;
 import com.example.urlshortener.common.ratelimit.RateLimiterService;
 import com.example.urlshortener.outbox.domain.DomainEventPublisher;
+import com.example.urlshortener.tag.service.TagService;
 import com.example.urlshortener.url.config.ShortCodeProperties;
 import com.example.urlshortener.url.dto.CreateShortUrlRequest;
 import com.example.urlshortener.url.dto.ShortUrlResponse;
@@ -15,6 +17,7 @@ import com.example.urlshortener.url.dto.UpdateDestinationRequest;
 import com.example.urlshortener.url.dto.UpdateShortUrlRequest;
 import com.example.urlshortener.url.entity.ShortUrlEntity;
 import com.example.urlshortener.url.repository.ShortUrlRepository;
+import com.example.urlshortener.url.search.UrlStateResolver;
 import com.example.urlshortener.user.entity.UserEntity;
 import com.example.urlshortener.user.entity.UserRole;
 import com.example.urlshortener.user.entity.UserStatus;
@@ -64,6 +67,9 @@ class UrlServiceTests {
     private WorkspaceContextResolver workspaceContextResolver;
     private AuditService auditService;
     private DomainEventPublisher domainEventPublisher;
+    private CampaignRepository campaignRepository;
+    private TagService tagService;
+    private UrlStateResolver stateResolver;
     private WorkspaceEntity workspace;
     private UUID workspaceId;
     private UrlService urlService;
@@ -84,12 +90,18 @@ class UrlServiceTests {
         workspaceContextResolver = Mockito.mock(WorkspaceContextResolver.class);
         auditService = Mockito.mock(AuditService.class);
         domainEventPublisher = Mockito.mock(DomainEventPublisher.class);
+        campaignRepository = Mockito.mock(CampaignRepository.class);
+        tagService = Mockito.mock(TagService.class);
+        stateResolver = Mockito.mock(UrlStateResolver.class);
         workspaceId = UUID.randomUUID();
         workspace = new WorkspaceEntity(workspaceId, "Test Workspace", true, null);
         when(workspaceContextResolver.resolveForLinkWriter(any())).thenReturn(new WorkspaceContext(workspaceId, UUID.randomUUID(), AuditActorType.USER, WorkspaceRole.OWNER, workspace));
         when(workspaceContextResolver.resolveForLinkReader(any())).thenReturn(new WorkspaceContext(workspaceId, UUID.randomUUID(), AuditActorType.USER, WorkspaceRole.OWNER, workspace));
         when(publicUrlBuilder.shortUrl(any())).thenAnswer(invocation -> "http://localhost:8080/r/" + invocation.getArgument(0));
-        urlService = new UrlService(shortUrlRepository, validationService, shortCodeGenerator, ownerProvider, userRepository, eventPublisher, rateLimiter, metrics, shortCodeProperties, quotaService, publicUrlBuilder, workspaceContextResolver, auditService, domainEventPublisher);
+        when(validationService.validatedDestinationHost(any())).thenReturn("example.com");
+        when(tagService.resolveOrCreate(any(), any())).thenReturn(java.util.Set.of());
+        when(stateResolver.state(any())).thenReturn("ACTIVE");
+        urlService = new UrlService(shortUrlRepository, validationService, shortCodeGenerator, ownerProvider, userRepository, eventPublisher, rateLimiter, metrics, shortCodeProperties, quotaService, publicUrlBuilder, workspaceContextResolver, auditService, domainEventPublisher, campaignRepository, tagService, stateResolver);
     }
 
     @Test
@@ -279,7 +291,7 @@ class UrlServiceTests {
 
         assertThat(response.getOriginalUrl()).isEqualTo("https://example.com/new");
         assertThat(entity.getShortCode()).isEqualTo("ABC1234");
-        verify(validationService).validateOriginalUrl("https://example.com/new");
+        verify(validationService).validatedDestinationHost("https://example.com/new");
         verify(eventPublisher).publishEvent(any(Object.class));
     }
 

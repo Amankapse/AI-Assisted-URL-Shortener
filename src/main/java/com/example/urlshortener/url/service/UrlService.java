@@ -1,5 +1,8 @@
 package com.example.urlshortener.url.service;
 
+import com.example.urlshortener.campaign.dto.CampaignSummaryResponse;
+import com.example.urlshortener.campaign.entity.CampaignEntity;
+import com.example.urlshortener.campaign.repository.CampaignRepository;
 import com.example.urlshortener.audit.entity.AuditAction;
 import com.example.urlshortener.audit.entity.AuditActorType;
 import com.example.urlshortener.audit.entity.AuditResourceType;
@@ -16,17 +19,21 @@ import com.example.urlshortener.outbox.payload.UrlCacheInvalidationPayloadV1;
 import com.example.urlshortener.outbox.payload.UrlStateChangedPayloadV1;
 import com.example.urlshortener.redirect.cache.RedirectCacheInvalidationEvent;
 import com.example.urlshortener.redirect.service.RedirectTarget;
+import com.example.urlshortener.tag.entity.TagEntity;
+import com.example.urlshortener.tag.service.TagService;
 import com.example.urlshortener.url.config.ShortCodeProperties;
 import com.example.urlshortener.url.dto.CreateShortUrlRequest;
 import com.example.urlshortener.url.dto.ShortUrlResponse;
 import com.example.urlshortener.url.dto.UpdateDestinationRequest;
 import com.example.urlshortener.url.dto.UpdateShortUrlRequest;
+import com.example.urlshortener.url.dto.UpdateUrlCampaignRequest;
+import com.example.urlshortener.url.dto.UpdateUrlTagsRequest;
 import com.example.urlshortener.url.entity.ShortUrlEntity;
 import com.example.urlshortener.url.repository.ShortUrlRepository;
+import com.example.urlshortener.url.search.UrlStateResolver;
 import com.example.urlshortener.user.entity.UserEntity;
 import com.example.urlshortener.user.repository.UserRepository;
 import com.example.urlshortener.user.service.CurrentOwnerProvider;
-import com.example.urlshortener.user.service.OwnerIdentity;
 import com.example.urlshortener.workspace.service.WorkspaceContext;
 import com.example.urlshortener.workspace.service.WorkspaceContextResolver;
 import org.springframework.context.ApplicationEventPublisher;
@@ -37,6 +44,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -56,6 +66,9 @@ public class UrlService {
     private final WorkspaceContextResolver workspaceContextResolver;
     private final AuditService auditService;
     private final DomainEventPublisher domainEventPublisher;
+    private final CampaignRepository campaignRepository;
+    private final TagService tagService;
+    private final UrlStateResolver stateResolver;
 
     public UrlService(ShortUrlRepository shortUrlRepository,
                       UrlValidationService validationService,
@@ -70,7 +83,10 @@ public class UrlService {
                       PublicUrlBuilder publicUrlBuilder,
                       WorkspaceContextResolver workspaceContextResolver,
                       AuditService auditService,
-                      DomainEventPublisher domainEventPublisher) {
+                      DomainEventPublisher domainEventPublisher,
+                      CampaignRepository campaignRepository,
+                      TagService tagService,
+                      UrlStateResolver stateResolver) {
         this.shortUrlRepository = shortUrlRepository;
         this.validationService = validationService;
         this.shortCodeGenerator = shortCodeGenerator;
@@ -85,6 +101,9 @@ public class UrlService {
         this.workspaceContextResolver = workspaceContextResolver;
         this.auditService = auditService;
         this.domainEventPublisher = domainEventPublisher;
+        this.campaignRepository = campaignRepository;
+        this.tagService = tagService;
+        this.stateResolver = stateResolver;
     }
 
     @Transactional
@@ -103,10 +122,12 @@ public class UrlService {
         rateLimiter.enforce("url-create", workspace.actorType() + ":" + workspace.actorId());
         UserEntity owner = ownerReference(workspace);
         try {
-            validationService.validateOriginalUrl(request.getOriginalUrl());
+            String destinationHost = validationService.validatedDestinationHost(request.getOriginalUrl());
             validationService.validateCustomAlias(request.getCustomAlias());
             validationService.validateExpiration(request.getCustomAlias(), request.getExpiresAt());
             quotaService.enforceCreateQuota(workspace.workspaceId(), request);
+            CampaignEntity campaign = resolveCampaign(request.getCampaignId(), workspace.workspaceId());
+            LinkedHashSet<TagEntity> tags = new LinkedHashSet<>(tagService.resolveOrCreate(workspace.workspace(), request.getTags()));
 
             String shortCode = request.getCustomAlias();
             if (shortCode != null && !shortCode.isBlank()) {
@@ -115,6 +136,9 @@ public class UrlService {
                 }
                 try {
                     ShortUrlEntity entity = new ShortUrlEntity(UUID.randomUUID(), shortCode, request.getOriginalUrl(), request.getCustomAlias(), owner, workspace.workspace(), request.getExpiresAt());
+                    entity.setDestinationHost(destinationHost);
+                    entity.setCampaign(campaign);
+                    entity.setTags(tags);
                     ShortUrlEntity saved = shortUrlRepository.save(entity);
                     recordActor(AuditAction.URL_CREATED, workspace, saved.getId(), auditService.urlCreatedMetadata(true, saved.getExpiresAt() != null));
                     publishUrlMutation(OutboxEventType.URL_CREATED, saved, workspace, "CREATED");
@@ -124,7 +148,7 @@ public class UrlService {
                     throw new BadRequestException("customAlias is already in use");
                 }
             } else {
-                return createWithGeneratedCode(request, owner, workspace);
+                return createWithGeneratedCode(request, owner, workspace, destinationHost, campaign, tags);
             }
         } catch (BadRequestException ex) {
             metrics.urlCreationFailed(failureReason(ex));
@@ -188,7 +212,7 @@ public class UrlService {
 
     @Transactional
     public ShortUrlResponse updateDestination(UUID id, UpdateDestinationRequest request, long expectedVersion, String workspaceHeader) {
-        validationService.validateOriginalUrl(request.getOriginalUrl());
+        String destinationHost = validationService.validatedDestinationHost(request.getOriginalUrl());
         WorkspaceContext workspace = workspaceContextResolver.resolveForLinkWriter(workspaceHeader);
         ShortUrlEntity entity = shortUrlRepository.findByIdAndWorkspaceId(id, workspace.workspaceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Short URL not found"));
@@ -197,6 +221,7 @@ public class UrlService {
         }
         String previousUrl = entity.getOriginalUrl();
         entity.setOriginalUrl(request.getOriginalUrl());
+        entity.setDestinationHost(destinationHost);
         ShortUrlResponse response = mapToResponse(shortUrlRepository.save(entity));
         recordActor(AuditAction.URL_DESTINATION_CHANGED, workspace, entity.getId(), auditService.destinationChangedMetadata(previousUrl, entity.getOriginalUrl()));
         publishUrlMutation(OutboxEventType.URL_DESTINATION_CHANGED, entity, workspace, "DESTINATION_CHANGED");
@@ -222,6 +247,38 @@ public class UrlService {
         publishUrlMutation(OutboxEventType.URL_DELETED, entity, workspace, "DELETED");
         publishCacheInvalidation(entity);
         eventPublisher.publishEvent(new RedirectCacheInvalidationEvent(entity.getShortCode()));
+    }
+
+    @Transactional
+    public ShortUrlResponse updateCampaign(UUID id, UpdateUrlCampaignRequest request, long expectedVersion, String workspaceHeader) {
+        WorkspaceContext workspace = workspaceContextResolver.resolveForLinkWriter(workspaceHeader);
+        ShortUrlEntity entity = shortUrlRepository.findByIdAndWorkspaceId(id, workspace.workspaceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Short URL not found"));
+        if (entity.getVersion() != expectedVersion) {
+            throw new PreconditionFailedException("If-Match header does not match the current URL version.");
+        }
+        boolean previousCampaignSet = entity.getCampaign() != null;
+        CampaignEntity campaign = resolveCampaign(request.getCampaignId(), workspace.workspaceId());
+        entity.setCampaign(campaign);
+        ShortUrlResponse response = mapToResponse(shortUrlRepository.save(entity));
+        recordActor(AuditAction.URL_CAMPAIGN_CHANGED, workspace, entity.getId(), auditService.urlCampaignChangedMetadata(previousCampaignSet, campaign != null));
+        return response;
+    }
+
+    @Transactional
+    public ShortUrlResponse replaceTags(UUID id, UpdateUrlTagsRequest request, long expectedVersion, String workspaceHeader) {
+        WorkspaceContext workspace = workspaceContextResolver.resolveForLinkWriter(workspaceHeader);
+        ShortUrlEntity entity = shortUrlRepository.findByIdAndWorkspaceId(id, workspace.workspaceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Short URL not found"));
+        if (entity.getVersion() != expectedVersion) {
+            throw new PreconditionFailedException("If-Match header does not match the current URL version.");
+        }
+        LinkedHashSet<TagEntity> tags = new LinkedHashSet<>(tagService.resolveOrCreate(workspace.workspace(), request.getTags()));
+        entity.setTags(tags);
+        ShortUrlResponse response = mapToResponse(shortUrlRepository.save(entity));
+        recordActor(AuditAction.URL_TAGS_CHANGED, workspace, entity.getId(), auditService.urlTagsChangedMetadata(tags.stream().map(TagEntity::getNormalizedName).sorted().toList()));
+        metrics.tags("replace", "success");
+        return response;
     }
 
     @Transactional
@@ -320,7 +377,7 @@ public class UrlService {
         }
     }
 
-    private ShortUrlResponse createWithGeneratedCode(CreateShortUrlRequest request, UserEntity owner, WorkspaceContext workspace) {
+    private ShortUrlResponse createWithGeneratedCode(CreateShortUrlRequest request, UserEntity owner, WorkspaceContext workspace, String destinationHost, CampaignEntity campaign, LinkedHashSet<TagEntity> tags) {
         for (int attempt = 0; attempt < shortCodeProperties.getMaxRetries(); attempt++) {
             String candidate = shortCodeGenerator.generate();
             if (shortUrlRepository.existsByShortCode(candidate)) {
@@ -329,6 +386,9 @@ public class UrlService {
             }
             try {
                 ShortUrlEntity entity = new ShortUrlEntity(UUID.randomUUID(), candidate, request.getOriginalUrl(), null, owner, workspace.workspace(), request.getExpiresAt());
+                entity.setDestinationHost(destinationHost);
+                entity.setCampaign(campaign);
+                entity.setTags(tags);
                 ShortUrlEntity saved = shortUrlRepository.save(entity);
                 recordActor(AuditAction.URL_CREATED, workspace, saved.getId(), auditService.urlCreatedMetadata(false, saved.getExpiresAt() != null));
                 publishUrlMutation(OutboxEventType.URL_CREATED, saved, workspace, "CREATED");
@@ -354,6 +414,13 @@ public class UrlService {
     }
 
     private ShortUrlResponse mapToResponse(ShortUrlEntity entity) {
+        CampaignSummaryResponse campaign = entity.getCampaign() == null
+                ? null
+                : new CampaignSummaryResponse(entity.getCampaign().getId(), entity.getCampaign().getName(), entity.getCampaign().getNormalizedName());
+        List<String> tags = entity.getTags().stream()
+                .map(TagEntity::getNormalizedName)
+                .sorted(Comparator.naturalOrder())
+                .toList();
         return new ShortUrlResponse(
                 entity.getId(),
                 entity.getShortCode(),
@@ -364,8 +431,19 @@ public class UrlService {
                 entity.getExpiresAt(),
                 entity.isEnabled(),
                 entity.getClickCount(),
-                entity.getVersion()
+                entity.getVersion(),
+                stateResolver.state(entity),
+                campaign,
+                tags
         );
+    }
+
+    private CampaignEntity resolveCampaign(UUID campaignId, UUID workspaceId) {
+        if (campaignId == null) {
+            return null;
+        }
+        return campaignRepository.findActiveByIdAndWorkspaceId(campaignId, workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Campaign not found"));
     }
 
     private void recordActor(AuditAction action, WorkspaceContext workspace, UUID resourceId, java.util.Map<String, Object> metadata) {

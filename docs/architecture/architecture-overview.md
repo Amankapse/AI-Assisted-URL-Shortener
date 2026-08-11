@@ -54,6 +54,43 @@ The URL shortener is designed as a modular monolith with clear feature boundarie
 - Audit records are append-only through application behavior. The audit table intentionally avoids cascading foreign keys so historical records survive user, URL, or workspace lifecycle changes. Cryptographic immutability and WORM storage remain production-evolution options.
 - Outbox records are operational delivery work items, not audit evidence. Liveness/readiness do not depend on the dispatcher; PostgreSQL readiness already protects the source of truth.
 
+## Live deployment architecture
+
+The Render deployment is a live demonstration environment, not the hyperscale target.
+
+```mermaid
+flowchart LR
+    Browser[Browser] --> StaticSite[Render Static Site<br/>Angular]
+    StaticSite --> Backend[Render Web Service<br/>Spring Boot]
+    Browser --> Redirects[Public /r/{shortCode}]
+    Redirects --> Backend
+    Backend --> Neon[(Neon PostgreSQL<br/>source of truth)]
+    Backend --> Valkey[(Render Key Value / Valkey<br/>cache and rate limits)]
+```
+
+Render Static Site hosts the Angular bundle and writes public runtime config during its build. The Spring Boot service reads production secrets from environment variables, runs Flyway on startup, validates the PostgreSQL schema with Hibernate, and keeps Redis/Valkey optional for redirect correctness.
+
+## Production-scale architecture target
+
+The documented 100M-new-URLs/day evolution would split traffic and storage differently:
+
+```mermaid
+flowchart LR
+    Users[Users] --> CDN[CDN / WAF / Global Edge]
+    CDN --> Static[Static Frontend CDN]
+    CDN --> LB[API Gateway / Load Balancer]
+    LB --> API[Spring Boot API Replicas]
+    LB --> Redirect[Redirect Fleet]
+    API --> PG[(Managed PostgreSQL / URL Metadata)]
+    Redirect --> RedisCluster[(Redis Cluster / Hot Mapping Cache)]
+    Redirect --> PG
+    API --> Broker[(Durable Event Stream)]
+    Redirect --> Broker
+    Broker --> Analytics[(Analytics Warehouse)]
+```
+
+This target requires managed multi-AZ infrastructure, distributed cache coordination, durable event streaming, edge caching, centralized observability, and formal autoscaling. It is intentionally documented as production evolution rather than claimed as implemented in the current single-artifact deployment.
+
 ## Hyperscale evolution boundary
 
 The current implementation remains a single Spring Boot artifact backed by PostgreSQL and Redis. The 100M-new-URLs/day target requires evolution toward independently scalable redirect fleets, distributed URL mapping storage, Redis Cluster, CDN/edge caching, WAF/global load balancing, durable event streaming, analytical warehouse separation, and multi-AZ/multi-region infrastructure. These are documented in [hyperscale evolution](hyperscale-evolution.md) and are not implemented locally.

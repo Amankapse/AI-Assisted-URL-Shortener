@@ -1,0 +1,6 @@
+<span class="chip">
+  {{ tag() }}
+  @if (removable()) {
+    <button type="button" [attr.aria-label]="'Remove ' + tag()" (click)="removed.emit(tag())">x</button>
+  }
+</span>

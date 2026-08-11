@@ -132,6 +132,29 @@ public class AuditService {
         );
     }
 
+    public Map<String, Object> campaignMetadata(String operation, String normalizedName, boolean descriptionSet) {
+        return metadata(
+                "operation", operation,
+                "normalizedName", normalizedName,
+                "descriptionSet", descriptionSet
+        );
+    }
+
+    public Map<String, Object> urlCampaignChangedMetadata(boolean previousCampaignSet, boolean newCampaignSet) {
+        return metadata(
+                "changedFields", List.of("campaignId"),
+                "previousCampaignSet", previousCampaignSet,
+                "newCampaignSet", newCampaignSet
+        );
+    }
+
+    public Map<String, Object> urlTagsChangedMetadata(List<String> normalizedTags) {
+        return metadata(
+                "changedFields", List.of("tags"),
+                "tags", normalizedTags
+        );
+    }
+
     public Map<String, Object> workspaceCreatedMetadata(boolean defaultWorkspace) {
         return metadata("defaultWorkspace", defaultWorkspace);
     }

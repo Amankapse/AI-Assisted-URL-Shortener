@@ -14,6 +14,8 @@ Prerequisites:
 - `APP_AUDIT_METADATA_MAX_BYTES` and `APP_AUDIT_RETENTION` reviewed for the environment
 - `APP_OUTBOX_*` dispatcher, retry, payload, and retention settings reviewed for the environment
 - `SHORTENER_CODE_LENGTH`, `SHORTENER_CODE_MAX_RETRIES`, and quota settings reviewed for the environment
+- Angular Static Site public runtime config values set for the deployed backend:
+  `FRONTEND_API_BASE_URL`, `FRONTEND_PUBLIC_SHORT_URL_BASE`, and `FRONTEND_ENVIRONMENT`
 
 Start local dependencies:
 
@@ -23,7 +25,7 @@ docker compose up -d postgres redis
 
 Start the application with the required datasource, Redis, JWT, analytics, and rate-limit environment variables. Flyway runs on startup and applies forward-only migrations.
 
-Current migrations are V1 through V9. V7 adds append-only application-level audit events with bounded JSONB metadata. V8 adds workspace-bound API keys and expands audit constraints for API-key create/revoke events. V9 adds transactional outbox events. Audit rows intentionally avoid cascading foreign keys so records survive user, URL, and workspace lifecycle changes.
+Current migrations are V1 through V10. V7 adds append-only application-level audit events with bounded JSONB metadata. V8 adds workspace-bound API keys and expands audit constraints for API-key create/revoke events. V9 adds transactional outbox events. V10 adds campaigns, tags, URL tag assignments, and search/filter indexes. Audit rows intentionally avoid cascading foreign keys so records survive user, URL, and workspace lifecycle changes.
 
 ## API latency increase
 
@@ -133,6 +135,35 @@ Investigate:
 - Payload-size errors if creation fails before an outbox row is committed.
 
 Do not manually update outbox rows in production without a documented repair plan. Retrying `DEAD` rows is intentionally not exposed through the public API in this stage.
+
+## Frontend deploy issue
+
+Expected Render Static Site settings:
+
+- Root directory: `frontend`
+- Build command: `npm ci && npm run build:render`
+- Publish directory: `dist/frontend/browser`
+- SPA rewrite: `/*` to `/index.html`
+- Public runtime config: `FRONTEND_API_BASE_URL`, `FRONTEND_PUBLIC_SHORT_URL_BASE`, and `FRONTEND_ENVIRONMENT`
+
+Investigate:
+
+- `dist/frontend/browser/app-config.json` contains the public backend origin and no secrets.
+- Direct Angular routes reload successfully because the rewrite is active.
+- Static headers allow only the deployed backend in `connect-src`.
+- Browser network requests target the Render backend, not `localhost`.
+- CORS and CSRF behavior match the deployed frontend/backend origins.
+
+## CORS, cookie, or CSRF issue
+
+Expected behavior:
+
+- Backend CORS uses an explicit allowlist and does not use wildcard credentials.
+- Refresh and logout remain CSRF protected.
+- Refresh cookies stay `Secure` and `HttpOnly` in production.
+- SameSite policy remains strict unless a reviewed deployment topology requires a change.
+
+If the frontend and backend are deployed on different `*.onrender.com` hostnames, browser cookie behavior may be cross-site. Prefer same-site custom domains such as `app.example.com` and `api.example.com` before weakening cookie policy. Do not switch to `SameSite=None` or loosen CSRF as an emergency workaround without a documented security review.
 
 ## High login failures
 

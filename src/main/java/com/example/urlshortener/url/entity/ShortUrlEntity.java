@@ -1,9 +1,13 @@
 package com.example.urlshortener.url.entity;
 
+import com.example.urlshortener.campaign.entity.CampaignEntity;
+import com.example.urlshortener.tag.entity.TagEntity;
 import com.example.urlshortener.user.entity.UserEntity;
 import com.example.urlshortener.workspace.entity.WorkspaceEntity;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -27,6 +31,9 @@ public class ShortUrlEntity {
     @Column(name = "custom_alias", length = 100)
     private String customAlias;
 
+    @Column(name = "destination_host", length = 253)
+    private String destinationHost;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false, foreignKey = @ForeignKey(name = "fk_short_urls_owner"))
     private UserEntity owner;
@@ -34,6 +41,18 @@ public class ShortUrlEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "workspace_id", nullable = false, foreignKey = @ForeignKey(name = "fk_short_urls_workspace"))
     private WorkspaceEntity workspace;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "campaign_id", foreignKey = @ForeignKey(name = "fk_short_urls_campaign"))
+    private CampaignEntity campaign;
+
+    @ManyToMany
+    @JoinTable(
+            name = "url_tags",
+            joinColumns = @JoinColumn(name = "url_id", foreignKey = @ForeignKey(name = "fk_url_tags_url")),
+            inverseJoinColumns = @JoinColumn(name = "tag_id", foreignKey = @ForeignKey(name = "fk_url_tags_tag"))
+    )
+    private Set<TagEntity> tags = new LinkedHashSet<>();
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -111,6 +130,14 @@ public class ShortUrlEntity {
         this.customAlias = customAlias;
     }
 
+    public String getDestinationHost() {
+        return destinationHost;
+    }
+
+    public void setDestinationHost(String destinationHost) {
+        this.destinationHost = destinationHost;
+    }
+
     public UserEntity getOwner() {
         return owner;
     }
@@ -125,6 +152,22 @@ public class ShortUrlEntity {
 
     public void setWorkspace(WorkspaceEntity workspace) {
         this.workspace = workspace;
+    }
+
+    public CampaignEntity getCampaign() {
+        return campaign;
+    }
+
+    public void setCampaign(CampaignEntity campaign) {
+        this.campaign = campaign;
+    }
+
+    public Set<TagEntity> getTags() {
+        return tags;
+    }
+
+    public void setTags(Set<TagEntity> tags) {
+        this.tags = tags == null ? new LinkedHashSet<>() : tags;
     }
 
     public LocalDateTime getCreatedAt() {

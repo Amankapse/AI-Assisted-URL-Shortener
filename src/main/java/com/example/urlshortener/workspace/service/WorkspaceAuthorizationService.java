@@ -74,6 +74,21 @@ public class WorkspaceAuthorizationService {
     }
 
     @Transactional(readOnly = true)
+    public WorkspaceContext requireCampaignReader(UUID workspaceId) {
+        return requireLinkReader(workspaceId);
+    }
+
+    @Transactional(readOnly = true)
+    public WorkspaceContext requireCampaignWriter(UUID workspaceId) {
+        return requireUser(workspaceId, LINK_WRITERS, "Workspace not found");
+    }
+
+    @Transactional(readOnly = true)
+    public WorkspaceContext requireCampaignDeleter(UUID workspaceId) {
+        return requireUser(workspaceId, MEMBER_MANAGERS, "Workspace not found");
+    }
+
+    @Transactional(readOnly = true)
     public WorkspaceContext requireOwner(UUID workspaceId) {
         return requireUser(workspaceId, EnumSet.of(WorkspaceRole.OWNER), "Workspace not found");
     }

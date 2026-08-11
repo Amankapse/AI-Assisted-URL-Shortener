@@ -117,3 +117,51 @@ This log records explicit approvals for decisions that affect architecture, secu
 - Explicitly deferred: tracing, QR codes, frontend, external broker infrastructure, distributed API gateway, and Stage 8 work.
 - Focused validation: `.\mvnw.cmd -q "-Dtest=OutboxIntegrationTests,OutboxRollbackIntegrationTests" test` passed; PostgreSQL Testcontainers started; Flyway V1-V9 validated and applied; Hibernate schema validation succeeded.
 - Full validation: `.\mvnw.cmd clean verify` passed with 113 tests and JaCoCo line 85.15% / branch 60.53%; PostgreSQL and Redis Testcontainers started; Flyway V1-V9 validated and applied; Hibernate schema validation succeeded; `.\mvnw.cmd dependency:tree` passed with no new production dependency; `docker compose config` passed without warnings.
+
+## Stage 8 Campaigns, Tags, Search, Filtering, And Large-Workspace UX
+
+- Approved implementation scope: Stage 8 campaigns, tags, search, filtering, and large-workspace UX only.
+- Approved migration: `V10__campaigns_tags_and_search.sql`; V1-V9 were not modified.
+- Approved public API surface: campaign endpoints under `/api/v1/workspaces/{workspaceId}/campaigns`, tag list endpoint under `/api/v1/workspaces/{workspaceId}/tags`, additive URL create `campaignId`/`tags`, URL metadata endpoints `PATCH /api/v1/urls/{id}/campaign` and `PUT /api/v1/urls/{id}/tags`, and optional URL list/search query parameters.
+- Approved authorization: campaign/tag reads for workspace readers and scoped API keys; campaign lifecycle management human-only; URL campaign/tag assignment through existing link-write authorization.
+- Approved search constraints: PostgreSQL-backed bounded exact/prefix search, allowlisted sort fields, offset paging, no raw destination-query/email/user/API-key/audit/outbox/analytics search, no pg_trgm/OpenSearch/new production dependency.
+- Explicitly deferred: Angular/frontend, QR codes, tracing, search-specific caches, distributed search infrastructure, separate search limiter, and Stage 9 work.
+- Validation: `docker info` passed; focused `.\mvnw.cmd -q -Dtest=OrganizationSearchIntegrationTests test` passed; `.\mvnw.cmd clean verify` passed with 118 backend tests and JaCoCo line 85.11% / branch 60.78%; PostgreSQL and Redis Testcontainers started; Flyway V1-V10 validated and applied; Hibernate schema validation succeeded; `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed with a non-fatal local Docker config access warning in this shell.
+- Corrections after Flyway startup: stale `idempotency_records` cleanup corrected to `idempotency_keys`; explicit Stage 8 controller `@PathVariable` names added; missing `PUT /api/v1/urls/**` security authorization added; idempotency normalization test made deterministic; campaignless search response mapping fixed.
+
+## Stage 9A Angular Production Frontend Foundation
+
+- Approved implementation scope: Stage 9A foundation only.
+- Approved dependencies/tooling: Angular 22 baseline generated dependencies, TypeScript strict mode, Angular Router, HttpClient, Reactive Forms, Signals, functional interceptors/guards, and Angular CLI-generated build/test tooling.
+- Explicitly not approved: Angular Material, PrimeNG, Bootstrap, Tailwind, NgRx, chart libraries, OpenAPI generator, Playwright, Cypress, frontend monitoring SDK, backend feature changes, backend auth redesign, or Stage 9B/9C/9D work.
+- Approved frontend/backend independence: Angular builds as a separate static artifact and is not copied into Spring Boot resources.
+- Approved auth model: memory-only access token, backend HttpOnly refresh cookie, startup refresh attempt, single-flight refresh on concurrent JWT 401s, no refresh for login/register/refresh/logout/API-key errors.
+- Approved CSRF model: preserve backend CSRF; frontend uses `XSRF-TOKEN` cookie and `X-XSRF-TOKEN` header for refresh/logout. Stage 9A documents current liveness-based CSRF bootstrap as an existing backend behavior, not a new API contract.
+- Validation: `npm ci` passed; `npm test -- --watch=false` passed with 7 Angular unit tests; `npm run build` passed with initial bundle 264.00 kB raw / 71.95 kB estimated transfer; backend regression `.\mvnw.cmd clean verify` passed with 118 tests and JaCoCo line 85.11% / branch 60.78%; `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed with a non-fatal local Docker config access warning.
+- Remaining warning: `npm audit --audit-level=moderate` reports 3 moderate vulnerabilities in the Angular CLI dev-dependency chain through `@modelcontextprotocol/sdk` and `@hono/node-server`. The suggested `npm audit fix --force` would install `@angular/cli@21.0.4`, which conflicts with the approved Angular 22 requirement, so it was rejected pending upstream Angular CLI remediation.
+
+## Stage 9B Production Link Management Experience
+
+- Approved implementation scope: Stage 9B production link-management experience only.
+- Approved frontend scope: `/app/urls`, `/app/urls/new`, `/app/urls/:id`, `/app/campaigns`, URL dashboard, create flow, details editing, campaign management, filters, sorting, pagination, workspace switching, and existing RFC7807 handling.
+- Approved API use: existing backend contracts only, including `Idempotency-Key`, `ETag`, `If-Match`, URL campaign/tag metadata endpoints, campaign endpoints, tag list endpoint, and existing enable/disable/delete behavior.
+- Explicitly not approved: analytics UI, audit UI, API-key UI, workspace-member management UI, platform-admin UI, QR codes, custom domains, tracing, backend architecture changes, backend migrations, backend auth changes, backend API contract changes, Stage 9C, new UI libraries, OpenAPI generator, Playwright, Cypress, NgRx, chart libraries, and frontend monitoring SDKs.
+- Validation: `npm ci` passed; `npm test -- --watch=false` passed with 13 Angular tests; `npm run build` passed with initial bundle 100.65 kB raw / 26.07 kB estimated transfer; backend regression `.\mvnw.cmd clean verify` passed with 118 tests and JaCoCo line 85.11% / branch 60.78%; `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed.
+- Remaining warning: `npm ci` continues to report 3 moderate Angular CLI dev-dependency-chain vulnerabilities and pending install-script review notices. `npm audit fix --force` remains rejected because it would downgrade the approved Angular 22 CLI baseline.
+
+## Stage 9C Enterprise Operations Frontend
+
+- Approved implementation scope: Stage 9C enterprise operations frontend only on top of Stage 9A/9B.
+- Approved API usage: existing backend contracts for URL analytics, workspace audit, URL audit, API keys, workspace/member management, platform analytics, moderation, platform audit, and read-only outbox.
+- Explicitly not approved: backend migrations, backend dependencies, backend API contracts, Stage 9D deployment/hardening, QR codes, custom domains, tracing UI, chart libraries, NgRx, Material/PrimeNG/Bootstrap/Tailwind, OpenAPI generator, Playwright, Cypress, telemetry SDKs, API-key update/rotate APIs, outbox retry/replay/delete UI, fabricated analytics fields, and treating workspace OWNER as platform ADMIN.
+- Security decisions: raw API keys are shown once in transient component state and cleared on acknowledgment; audit metadata is allowlisted and rendered as text; platform navigation requires authenticated user role `ADMIN`.
+- Validation: `npm ci` passed with known Angular CLI dev-chain warnings; `npm test -- --watch=false` passed with 21 Angular tests; `npm run build` passed with initial bundle 103.64 kB raw / 26.71 kB estimated transfer and Stage 9C feature chunks lazy-loaded; `npm audit --audit-level=moderate` reported the known 3 moderate Angular CLI dev-chain findings; `.\mvnw.cmd clean verify` passed with 118 backend tests and JaCoCo line 85.11% / branch 60.78%; PostgreSQL and Redis Testcontainers started; Flyway V1-V10 validated/applied; Hibernate schema validation succeeded; `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed.
+
+## Stage 9D Production Deployment Hardening And Final Evidence
+
+- Approved implementation scope: Stage 9D deployment hardening, release readiness, and final evidence only.
+- Approved frontend deployment direction: keep Angular independently deployable as a Render Static Site/CDN artifact; do not merge it into the Spring Boot JAR.
+- Approved public runtime configuration: generate browser-visible `app-config.json` from Render Static Site environment variables containing only public API origin, public short URL base, and environment label.
+- Approved CI policy: continue running frontend install/test/build and add a high-severity audit gate; keep known moderate Angular CLI development-chain findings documented rather than forcing a destabilizing downgrade.
+- Explicitly not approved: backend migrations, backend business-logic changes, backend auth redesign, SameSite/CSRF weakening, QR codes, custom domains, tracing UI, Kafka/Kinesis/Pulsar, distributed KV implementation, Redis Cluster code, Kubernetes manifests, billing, malware integration, and new analytics dimensions.
+- Validation: `.\mvnw.cmd clean verify` passed with 118 backend tests and JaCoCo line 85.11% / branch 60.78%; PostgreSQL and Redis Testcontainers started; Flyway V1-V10 validated/applied; Hibernate schema validation succeeded. `.\mvnw.cmd dependency:tree` passed; `docker compose config` passed; `npm ci`, `npm test -- --watch=false` with 21 tests, `npm run build`, and `npm run build:render` passed. `npm audit --audit-level=moderate` reported the known 3 moderate Angular CLI dev-chain findings, while `npm audit --audit-level=high` passed. `git diff --check` passed; repository and compiled frontend secret scans found no committed secret values. k6 was unavailable locally, and live frontend cookie/CSRF/reload smoke validation remains pending until the frontend Render Static Site URL is available.
