@@ -1,0 +1,59 @@
+.public-content {
+  margin: 0 auto;
+  max-width: 58rem;
+  padding: 0 1.5rem 4rem;
+}
+
+header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  min-height: 4.5rem;
+}
+
+.wordmark {
+  color: var(--text-primary);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+a {
+  border-radius: 6px;
+  color: var(--color-brand);
+  padding: 0.45rem 0.55rem;
+  text-decoration: none;
+}
+
+article {
+  padding-top: 4rem;
+}
+
+.eyebrow {
+  color: var(--color-accent);
+  font-weight: 800;
+  margin: 0 0 0.5rem;
+}
+
+h1 {
+  font-size: 2.4rem;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.summary {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.body-text {
+  color: var(--text-primary);
+  line-height: 1.7;
+  white-space: pre-line;
+}

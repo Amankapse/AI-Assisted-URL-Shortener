@@ -1,35 +1,55 @@
-<header class="topbar">
-  <a class="brand" routerLink="/app/urls">Shortener Ops</a>
-  @if (authState.user(); as user) {
-    <div class="session">
-      <nav aria-label="Primary navigation">
-        <a routerLink="/app/urls" routerLinkActive="active">Links</a>
-        <a routerLink="/app/campaigns" routerLinkActive="active">Campaigns</a>
-        <a routerLink="/app/audit" routerLinkActive="active">Audit</a>
-        <a routerLink="/app/api-keys" routerLinkActive="active">API Keys</a>
-        <a routerLink="/app/workspace" routerLinkActive="active">Workspace</a>
-        @if (authState.isAdmin()) {
-          <a routerLink="/app/admin/overview" routerLinkActive="active">Platform</a>
-        }
+<div class="app-shell">
+  <aside class="rail">
+    <a class="brand" routerLink="/app">Shortener Ops</a>
+    <nav aria-label="Workspace navigation">
+      <span class="nav-label">Workspace</span>
+      <a routerLink="/app" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Overview</a>
+      <a routerLink="/app/urls" routerLinkActive="active">Links</a>
+      <a routerLink="/app/campaigns" routerLinkActive="active">Campaigns</a>
+      <a routerLink="/app/urls" routerLinkActive="active">Analytics</a>
+      <a routerLink="/app/audit" routerLinkActive="active">Audit</a>
+      <a routerLink="/app/api-keys" routerLinkActive="active">API Keys</a>
+      <a routerLink="/app/workspace" routerLinkActive="active">Workspace</a>
+    </nav>
+    @if (authState.isAdmin()) {
+      <nav aria-label="Platform administration">
+        <span class="nav-label">Platform</span>
+        <a routerLink="/app/admin/overview" routerLinkActive="active">Administration</a>
+        <a routerLink="/app/admin/experience" routerLinkActive="active">Experience</a>
+        <a routerLink="/app/admin/content" routerLinkActive="active">Content</a>
+        <a routerLink="/app/admin/announcements" routerLinkActive="active">Announcements</a>
+        <a routerLink="/app/admin/media" routerLinkActive="active">Media</a>
       </nav>
-      <select
-        aria-label="Current workspace"
-        [disabled]="workspaceState.loading()"
-        [value]="workspaceState.selectedWorkspaceId() ?? ''"
-        (change)="workspaceState.select($any($event.target).value)"
-      >
-        @for (workspace of workspaceState.workspaces(); track workspace.id) {
-          <option [value]="workspace.id">{{ workspace.name }} ({{ workspace.role }})</option>
-        }
-      </select>
-      <span>{{ user.email }}</span>
-      <button type="button" (click)="auth.logout().subscribe()">Sign out</button>
-    </div>
-  }
-</header>
+    }
+  </aside>
 
-<main class="shell-main">
-  <router-outlet />
-</main>
+  <div class="workspace">
+    <header class="topbar">
+      @if (authState.user(); as user) {
+        <div>
+          <strong>{{ user.email }}</strong>
+          <span>{{ user.role === 'ADMIN' ? 'Platform administrator' : 'Workspace user' }}</span>
+        </div>
+        <div class="session">
+          <select
+            aria-label="Current workspace"
+            [disabled]="workspaceState.loading()"
+            [value]="workspaceState.selectedWorkspaceId() ?? ''"
+            (change)="workspaceState.select($any($event.target).value)"
+          >
+            @for (workspace of workspaceState.workspaces(); track workspace.id) {
+              <option [value]="workspace.id">{{ workspace.name }} ({{ workspace.role }})</option>
+            }
+          </select>
+          <button type="button" (click)="auth.logout().subscribe()">Sign out</button>
+        </div>
+      }
+    </header>
+
+    <main class="shell-main">
+      <router-outlet />
+    </main>
+  </div>
+</div>
 
 <app-notification-center />

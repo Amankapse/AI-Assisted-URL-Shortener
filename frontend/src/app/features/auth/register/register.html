@@ -1,6 +1,17 @@
 <section class="auth-page">
+  <aside class="trust-panel">
+    <a class="wordmark" routerLink="/">{{ site.brandName() }}</a>
+    <h1>Create a workspace-ready account</h1>
+    <p>Start with a normal user account. Platform administrator access is granted only through the documented server-side bootstrap flow.</p>
+    <nav aria-label="Support navigation">
+      <a routerLink="/terms">Terms</a>
+      <a routerLink="/accessibility">Accessibility</a>
+      <a routerLink="/disclaimer">Disclaimer</a>
+    </nav>
+  </aside>
+
   <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
-    <h1>Create account</h1>
+    <h2>Create account</h2>
 
     <label for="email">Email</label>
     <input id="email" type="email" formControlName="email" autocomplete="email" />

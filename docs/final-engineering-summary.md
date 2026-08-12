@@ -8,7 +8,7 @@ The original URL-shortener requirement was normalized into phased, testable requ
 
 The application uses a modular monolith because the assessment benefits from clear package boundaries without distributed-system overhead. The modules are organized around auth, user, URL, redirect, analytics, security, common infrastructure, and configuration.
 
-PostgreSQL is the source of truth for users, workspaces, memberships, URLs, refresh-token digests, API-key digests, analytics, idempotency records, and audit events. Flyway owns schema evolution and Hibernate validates mappings against the migrated schema.
+PostgreSQL is the source of truth for users, workspaces, memberships, URLs, refresh-token digests, API-key digests, analytics, idempotency records, audit events, and bounded site experience content. Flyway owns schema evolution and Hibernate validates mappings against the migrated schema.
 
 Redis is used only as an optimization for redirect cache-aside and distributed rate limiting. Redirect correctness remains PostgreSQL-backed, and Redis health does not make the service unready.
 
@@ -41,6 +41,8 @@ The enterprise audit evolution added append-only application-level audit events 
 Stage 6 added machine-to-machine API keys as a brownfield security extension. The change added V8 `api_keys`, one-time raw key return, HMAC-SHA-256 digest storage, workspace-bound scopes, API-key rate limiting, API-key create/revoke audit events, and service-layer actor attribution without changing human JWT/refresh-token behavior.
 
 Stage 7 added transactional outbox delivery as a brownfield durability extension. The change added V9 `outbox_events`, same-transaction URL mutation events, durable cache invalidation work, opt-in outbox analytics publishing, bounded PostgreSQL `SKIP LOCKED` dispatch, retry/dead-letter handling, low-cardinality metrics, and read-only platform-admin inspection without adding a broker or changing the redirect cache-aside architecture.
+
+Stage 10 added a bounded site experience and platform-admin CMS layer. The change added V11 `site_settings`, `content_pages`, `announcements`, and `media_assets`, public read APIs under `/api/v1/site/**`, platform-admin write APIs under `/api/v1/admin/site/**`, ETag/If-Match optimistic updates, safe audit events, and a one-time `APP_BOOTSTRAP_ADMIN_EMAIL` promotion path for an existing registered user. It deliberately avoided arbitrary HTML CMS behavior, binary uploads, a public admin-promotion endpoint, default admin credentials, and new frontend dependencies.
 
 ## Ambiguous Scenario
 
@@ -83,6 +85,7 @@ Edited examples:
 - Audit query implementation was edited from nullable JPQL parameters to dynamic JPA specifications after PostgreSQL rejected ambiguous null timestamp parameters during Testcontainers validation.
 - API-key output was edited to avoid delimiter ambiguity in generated key parsing, to disable servlet auto-registration of the security filter, and to return RFC7807 429 responses from the filter path when the API-key limiter rejects.
 - Outbox test output was edited to use the application UTC `Clock` rather than machine-local time so dispatcher scheduling semantics are tested accurately.
+- Stage 10 announcement test data was edited to use the service's default active window after a timezone-sensitive validation failure exposed local-clock drift.
 
 Rejected examples:
 
@@ -90,6 +93,7 @@ Rejected examples:
 - A custom JWT filter approach; replaced with Spring Security resource server support and `NimbusJwtDecoder`.
 - Redis readiness dependency; rejected because Redis is not required for correctness and would cause bad orchestration behavior.
 - Switching to MD5 truncation, sequential public IDs, or Hashids as a security mechanism was rejected for short-code generation.
+- Stage 10 rejected unrestricted CMS HTML/Markdown rendering, `DomSanitizer` bypasses, default admin credentials, admin password environment variables, API-key CMS authorization, and SVG media acceptance.
 
 Traceability is maintained in `docs/ai-assisted-engineering/`.
 
@@ -107,6 +111,8 @@ The implementation chose simpler, safer approaches where appropriate:
 - Audit metadata avoids passwords, tokens, cookies, raw destination URLs, raw IP addresses, and unbounded JSON; audit rows are append-only through application behavior.
 - API-key storage uses one-way HMAC digests and never stores raw keys; API keys do not receive `ROLE_ADMIN` and cannot manage workspaces or other API keys.
 - Outbox payloads are bounded DTOs, not JPA entities or secrets; admin inspection omits raw payload JSON.
+- CMS content is bounded and rendered as text, not HTML. Public pages are limited to approved page keys, media is HTTPS URL metadata only, and platform CMS writes require `ROLE_ADMIN`.
+- First-admin bootstrap promotes only an existing registered user, creates no account or password, audits the promotion, and should be removed from the environment after use.
 - The shortcode default moved to 8-character random Base62 rather than sequential public IDs, MD5 truncation, or Hashids-as-security.
 - Moderation is represented as `blocked` alongside existing enabled/deleted/expiration state rather than replacing lifecycle with a broad enum migration.
 
@@ -119,7 +125,7 @@ Final release validation includes:
 - `docker compose config`
 - PostgreSQL Testcontainers
 - Redis Testcontainers
-- Flyway V1 through V10 validation and application
+- Flyway V1 through V11 validation and application
 - Hibernate schema validation
 - JaCoCo coverage report generation
 - GitHub Actions workflow definition
@@ -127,15 +133,15 @@ Final release validation includes:
 
 Final local results:
 
-- Backend tests: 120 passing
-- Frontend tests: 22 passing
-- Line coverage: 85.11%
-- Branch coverage: 60.78%
+- Backend tests: 125 passing
+- Frontend tests: 28 passing
+- Line coverage: 85.07%
+- Branch coverage: 60.15%
 - Docker: PostgreSQL and Redis Testcontainers started successfully
-- Migrations: Flyway V1 through V10 validated and applied
+- Migrations: Flyway V1 through V11 validated and applied
 - Schema: Hibernate validation succeeded
 - Compose: `docker compose config` passed without warnings
-- Frontend build: Angular production build passed with 103.64 kB raw / 26.69 kB estimated transfer initial bundle
+- Frontend build: Angular production build passed with 107.57 kB raw / 28.00 kB estimated transfer initial bundle
 - Render full-stack build: Docker packages Angular `dist/frontend/browser` into the Spring Boot JAR for one Render Web Service; local packaged-image smoke confirmed SPA/backend route separation with `PORT=10000`
 - Render frontend config: `npm run build:render` generates public `app-config.json`; current same-origin deployment uses `apiBaseUrl: ""`
 
@@ -156,6 +162,8 @@ Known limitations:
 - Local load testing was not executed because k6 was unavailable.
 - Audit immutability is application-level only; cryptographic chaining and WORM storage are not implemented.
 - API keys are bearer credentials; stolen raw keys remain usable until expiration or revocation, and pepper rotation requires coordinated key reissue.
+- Platform administrator MFA is not implemented.
+- CMS media depends on externally hosted HTTPS assets; binary upload/scanning is not implemented.
 - The local implementation does not include CDN/edge routing, WAF, Redis Cluster, distributed URL storage, Kafka/Kinesis/Pulsar, OLAP analytics warehouse, or multi-region infrastructure.
 
 ## Production Evolution

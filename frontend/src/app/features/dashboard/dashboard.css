@@ -4,7 +4,7 @@
 }
 
 .eyebrow {
-  color: #0f766e;
+  color: var(--color-accent);
   font-weight: 700;
   margin: 0 0 0.25rem;
   text-transform: uppercase;
@@ -15,21 +15,38 @@ h1 {
   margin: 0;
 }
 
+.intro {
+  color: var(--text-secondary);
+  margin: 0.5rem 0 0;
+}
+
+.summary-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .summary {
-  border: 1px solid #dbe3ef;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 8px;
   display: grid;
   gap: 0.3rem;
-  max-width: 30rem;
   padding: 1rem;
 }
 
 .summary span,
 .summary small,
 .empty {
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .summary strong {
   font-size: 1.2rem;
+}
+
+@media (max-width: 760px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -7,6 +7,7 @@ import com.example.urlshortener.idempotency.config.IdempotencyProperties;
 import com.example.urlshortener.common.ratelimit.RateLimitProperties;
 import com.example.urlshortener.outbox.config.OutboxProperties;
 import com.example.urlshortener.redirect.config.RedirectCacheProperties;
+import com.example.urlshortener.site.config.AdminBootstrapProperties;
 import com.example.urlshortener.url.config.AppUrlProperties;
 import com.example.urlshortener.url.config.ShortCodeProperties;
 import com.example.urlshortener.url.config.UrlOrganizationProperties;
@@ -29,7 +30,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         ApiKeyProperties.class,
         AuditProperties.class,
         ShortCodeProperties.class,
-        UrlQuotaProperties.class
+        UrlQuotaProperties.class,
+        AdminBootstrapProperties.class
 })
 public class UrlShortenerApplication {
     public static void main(String[] args) {

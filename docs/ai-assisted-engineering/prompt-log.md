@@ -841,3 +841,54 @@ The regression test was focused on `initializeApplication()` under `TestBed.runI
 ### Rejected
 
 Backend route changes, hash routing, CORS/cookie changes, Docker architecture changes, and moving authentication startup out of the Angular initializer were rejected as outside the blank-page regression scope.
+
+## P-035 Stage 10 Premium Enterprise UX, Admin CMS, And Secure Admin Bootstrap
+
+- Scope: implement Stage 10 only.
+- Approved migration: `V11__site_branding_and_content.sql`; V1-V10 were not modified.
+- Approved backend scope:
+  - bounded `site_settings`, `content_pages`, `announcements`, and `media_assets` tables;
+  - public read APIs under `/api/v1/site/**`;
+  - platform-admin CMS APIs under `/api/v1/admin/site/**`;
+  - audit actions/resource types for CMS changes and `ADMIN_PROMOTED`;
+  - transactional, idempotent `APP_BOOTSTRAP_ADMIN_EMAIL` startup promotion of one existing registered user.
+- Approved frontend scope:
+  - public landing page at `/`;
+  - public content pages;
+  - split login/register layout;
+  - left navigation application shell;
+  - inexpensive `/app` overview;
+  - admin CMS routes for experience, content, announcements, and media.
+- Security decisions:
+  - no default admin account or admin password environment variable;
+  - no unrestricted CMS schema, raw HTML, Markdown renderer, `[innerHTML]`, or sanitizer bypass;
+  - media is HTTPS URL metadata only and Stage 10 rejects SVG URLs;
+  - workspace `ADMIN` is not platform `ADMIN`;
+  - API keys do not authorize CMS/admin endpoints;
+  - `/r/{shortCode}` remains isolated from CMS tables and API calls.
+- Validation:
+  - `.\mvnw.cmd clean verify` passed with 125 backend tests.
+  - PostgreSQL Testcontainers started; Flyway validated and applied V1-V11; Hibernate schema validation succeeded.
+  - JaCoCo instruction 85.50%, line 85.07%, branch 60.15%.
+  - `.\mvnw.cmd dependency:tree` passed; no new production dependency was added.
+  - `docker compose config` passed.
+  - `npm ci` passed with known Angular CLI dev-chain moderate advisories.
+  - `npm test -- --watch=false` passed with 28 frontend tests.
+  - `npm run build` passed; initial bundle 107.57 kB raw / 28.00 kB transfer.
+  - `npm run build:render` passed with safe local placeholder public runtime variables after the first attempt failed because `FRONTEND_PUBLIC_SHORT_URL_BASE` was not set locally.
+  - `npm audit --audit-level=moderate` reported 3 known moderate Angular CLI dev-chain findings; `npm audit fix --force` remains rejected because it would downgrade Angular CLI.
+  - `docker build -t url-shortener-fullstack .` passed; image size approximately 168 MB.
+
+## P-035 AI Output Examples
+
+### Accepted
+
+The bounded CMS schema, explicit page-key/status/severity/audience enums, ETag/If-Match mutations, and admin bootstrap startup runner were accepted because they satisfy Stage 10 without creating arbitrary CMS behavior or an admin backdoor.
+
+### Edited
+
+An announcement test initially used system-local `LocalDateTime.now()` for its active window; validation showed the application clock is UTC, so the test was edited to omit schedule fields and exercise the default active window.
+
+### Rejected
+
+New UI libraries, generated/AI imagery, unrestricted administrator HTML, SVG media acceptance, binary uploads, a `/promote-admin` endpoint, default admin credentials, API-key CMS access, broad `/api/v1/admin/**` permitting, and redirect-path CMS lookups were rejected.

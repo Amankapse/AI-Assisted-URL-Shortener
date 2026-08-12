@@ -28,6 +28,9 @@
 | Oversized requests | Memory pressure | Tomcat form/swallow limits and DTO limits | Container/proxy limits also required |
 | Enumeration | User/account discovery | Generic login failures and generic rate-limit response | Registration duplicate still reveals registered email |
 | Admin privilege abuse | Data exposure | Explicit admin endpoints, no platform-admin bypass on workspace APIs | Admin account compromise |
+| First-admin bootstrap misuse | Accidental or malicious platform admin promotion | `APP_BOOTSTRAP_ADMIN_EMAIL` only promotes an existing registered user, creates no password/account, is idempotent, audits successful promotion, and should be removed after use | Platform administrator MFA is not currently implemented |
+| CMS content injection | Stored script execution or visual abuse | Site CMS stores structured/plain text, uses allowlisted page keys/enums, rejects suspicious script markup, validates color format/contrast, and accepts HTTPS raster media metadata only | Admin-provided text still requires editorial review |
+| External media abuse | Privacy leakage, mixed content, or unsafe SVG behavior | Media assets are URL-backed metadata only, require HTTPS, reject SVG in Stage 10, and fall back to text branding if media fails | Remote image hosts remain external dependencies |
 | Actuator exposure | Secret/config disclosure | Only health/info/metrics exposed; metrics admin-protected | Misconfigured security profiles |
 | Audit tampering | Loss of accountability | No update/delete audit API, same-transaction audit insert for mutations, append-only table design, no cascading audit FKs | Database superusers can still alter records; cryptographic/WORM immutability is not implemented |
 | Sensitive audit metadata | PII or token leakage | Allowlisted bounded metadata, destination changes store hosts and hashes instead of raw URLs, no passwords/tokens/cookies | Future audit event additions require review |

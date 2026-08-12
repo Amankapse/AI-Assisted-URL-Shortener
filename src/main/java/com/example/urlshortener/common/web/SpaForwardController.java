@@ -9,6 +9,15 @@ public class SpaForwardController {
             "/",
             "/login",
             "/register",
+            "/features",
+            "/security",
+            "/about",
+            "/help",
+            "/contact",
+            "/privacy",
+            "/terms",
+            "/accessibility",
+            "/disclaimer",
             "/app",
             "/app/**"
     })

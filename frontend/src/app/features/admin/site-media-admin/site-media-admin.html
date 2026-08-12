@@ -1,0 +1,36 @@
+<section class="admin-cms">
+  <header>
+    <p class="eyebrow">Platform CMS</p>
+    <h1>Media</h1>
+  </header>
+
+  <div class="grid">
+    <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <fieldset>
+        <legend>Externally hosted asset</legend>
+        <label>Name <input formControlName="name" /></label>
+        <label>HTTPS URL <input formControlName="url" /></label>
+        <label>Alt text <input formControlName="altText" /></label>
+        <label>Source <input formControlName="sourceName" /></label>
+        <label>Source URL <input formControlName="sourceUrl" /></label>
+        <label>License <input formControlName="license" /></label>
+        <label>Attribution <textarea formControlName="attribution"></textarea></label>
+        <label><input type="checkbox" formControlName="enabled" /> Enabled</label>
+      </fieldset>
+      @if (message()) {
+        <p class="notice" role="status">{{ message() }}</p>
+      }
+      <button type="submit" [disabled]="loading()">Register media</button>
+    </form>
+
+    <aside class="panel list">
+      @for (item of media(); track item.id) {
+        <article>
+          <strong>{{ item.name }}</strong>
+          <small>{{ item.enabled ? 'Enabled' : 'Disabled' }} - {{ item.sourceName || 'No source' }}</small>
+          <a [href]="item.url" target="_blank" rel="noreferrer">{{ item.url }}</a>
+        </article>
+      }
+    </aside>
+  </div>
+</section>

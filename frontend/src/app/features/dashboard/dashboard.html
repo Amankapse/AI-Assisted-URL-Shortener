@@ -1,17 +1,30 @@
 <section class="dashboard">
   <div>
     <p class="eyebrow">Workspace</p>
-    <h1>URL management foundation</h1>
+    <h1>Operations overview</h1>
+    <p class="intro">A compact starting point for managing links, campaigns, audit evidence and workspace access.</p>
   </div>
 
   @if (workspaceState.loading()) {
     <app-loading-state label="Loading workspace context..." />
   } @else if (workspaceState.selectedWorkspace(); as workspace) {
-    <article class="summary">
-      <span>Selected workspace</span>
-      <strong>{{ workspace.name }}</strong>
-      <small>{{ workspace.role }}</small>
-    </article>
+    <div class="summary-grid">
+      <article class="summary">
+        <span>Selected workspace</span>
+        <strong>{{ workspace.name }}</strong>
+        <small>{{ workspace.role }}</small>
+      </article>
+      <article class="summary">
+        <span>Next action</span>
+        <strong>Create or review links</strong>
+        <small>Use the Links section for creation, filtering and analytics.</small>
+      </article>
+      <article class="summary">
+        <span>Governance</span>
+        <strong>Audit-ready changes</strong>
+        <small>Workspace and URL mutations are recorded in the audit trail.</small>
+      </article>
+    </div>
   } @else {
     <p class="empty">No workspace is available for this account.</p>
   }

@@ -53,6 +53,8 @@ server:
     max-swallow-size: ${SERVER_MAX_SWALLOW_SIZE:2MB}
 app:
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
+  bootstrap:
+    admin-email: ${APP_BOOTSTRAP_ADMIN_EMAIL:}
   auth:
     issuer: ${APP_AUTH_ISSUER:url-shortener}
     audience: ${APP_AUTH_AUDIENCE:url-shortener-api}

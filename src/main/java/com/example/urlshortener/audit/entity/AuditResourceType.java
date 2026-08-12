@@ -5,5 +5,10 @@ public enum AuditResourceType {
     CAMPAIGN,
     WORKSPACE,
     WORKSPACE_MEMBER,
-    API_KEY
+    API_KEY,
+    SITE_SETTINGS,
+    CONTENT_PAGE,
+    ANNOUNCEMENT,
+    MEDIA_ASSET,
+    USER
 }

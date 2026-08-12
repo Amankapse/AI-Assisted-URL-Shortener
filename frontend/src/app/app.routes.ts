@@ -6,6 +6,55 @@ import { AppShell } from './layout/app-shell';
 
 export const routes: Routes = [
   {
+    path: '',
+    loadComponent: () => import('./features/public/landing/landing').then((m) => m.Landing)
+  },
+  {
+    path: 'features',
+    loadComponent: () => import('./features/public/content-page/content-page').then((m) => m.ContentPage),
+    data: { pageKey: 'FEATURES' }
+  },
+  {
+    path: 'security',
+    loadComponent: () => import('./features/public/content-page/content-page').then((m) => m.ContentPage),
+    data: { pageKey: 'SECURITY' }
+  },
+  {
+    path: 'about',
+    loadComponent: () => import('./features/public/content-page/content-page').then((m) => m.ContentPage),
+    data: { pageKey: 'ABOUT' }
+  },
+  {
+    path: 'help',
+    loadComponent: () => import('./features/public/content-page/content-page').then((m) => m.ContentPage),
+    data: { pageKey: 'HELP' }
+  },
+  {
+    path: 'contact',
+    loadComponent: () => import('./features/public/content-page/content-page').then((m) => m.ContentPage),
+    data: { pageKey: 'CONTACT' }
+  },
+  {
+    path: 'privacy',
+    loadComponent: () => import('./features/public/content-page/content-page').then((m) => m.ContentPage),
+    data: { pageKey: 'PRIVACY' }
+  },
+  {
+    path: 'terms',
+    loadComponent: () => import('./features/public/content-page/content-page').then((m) => m.ContentPage),
+    data: { pageKey: 'TERMS' }
+  },
+  {
+    path: 'accessibility',
+    loadComponent: () => import('./features/public/content-page/content-page').then((m) => m.ContentPage),
+    data: { pageKey: 'ACCESSIBILITY' }
+  },
+  {
+    path: 'disclaimer',
+    loadComponent: () => import('./features/public/content-page/content-page').then((m) => m.ContentPage),
+    data: { pageKey: 'DISCLAIMER' }
+  },
+  {
     path: 'login',
     canActivate: [guestGuard],
     loadComponent: () => import('./features/auth/login/login').then((m) => m.Login)
@@ -20,7 +69,10 @@ export const routes: Routes = [
     component: AppShell,
     canActivate: [authGuard],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'urls' },
+      {
+        path: '',
+        loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard)
+      },
       {
         path: 'urls',
         loadComponent: () => import('./features/urls/url-dashboard/url-dashboard').then((m) => m.UrlDashboard)
@@ -73,11 +125,26 @@ export const routes: Routes = [
           {
             path: 'outbox',
             loadComponent: () => import('./features/admin/admin-outbox/admin-outbox').then((m) => m.AdminOutbox)
+          },
+          {
+            path: 'experience',
+            loadComponent: () => import('./features/admin/site-experience-admin/site-experience-admin').then((m) => m.SiteExperienceAdmin)
+          },
+          {
+            path: 'content',
+            loadComponent: () => import('./features/admin/site-content-admin/site-content-admin').then((m) => m.SiteContentAdmin)
+          },
+          {
+            path: 'announcements',
+            loadComponent: () => import('./features/admin/site-announcements-admin/site-announcements-admin').then((m) => m.SiteAnnouncementsAdmin)
+          },
+          {
+            path: 'media',
+            loadComponent: () => import('./features/admin/site-media-admin/site-media-admin').then((m) => m.SiteMediaAdmin)
           }
         ]
       }
     ]
   },
-  { path: '', pathMatch: 'full', redirectTo: 'app' },
   { path: '**', redirectTo: 'app' }
 ];

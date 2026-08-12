@@ -23,6 +23,9 @@ Current coverage of frontend behavior:
 - platform moderation and outbox admin endpoints
 - audit metadata allowlisting
 - workspace permission separation from platform admin state
+- public landing fallback branding and public content routing
+- site experience settings, content, announcements, media, and admin CMS ETag calls
+- admin CMS route guard behavior and platform navigation isolation
 
 Security/dependency note: `npm audit --audit-level=moderate` currently reports 3 moderate findings in the Angular CLI dev-dependency chain through `@modelcontextprotocol/sdk` and `@hono/node-server`. The suggested forced fix would downgrade Angular CLI to 21.0.4, so it was not applied.
 
@@ -34,6 +37,6 @@ npm test -- --watch=false
 npm run build
 ```
 
-Stage 9D validation: `npm test -- --watch=false` passed with 22 tests, and `npm run build` passed with initial bundle 103.64 kB raw / 26.69 kB estimated transfer. The packaged-image smoke test also confirmed that Angular SPA routes and backend routes are served correctly from one Spring Boot Docker image. The local sandbox blocks Angular compiler reads for source/style files and `node_modules`, so frontend validation commands are run with scoped filesystem access outside the sandbox.
+Stage 10 validation: `npm test -- --watch=false` passed with 28 tests, and `npm run build` passed with initial bundle 107.57 kB raw / 28.00 kB estimated transfer. The packaged-image smoke test also confirmed that Angular SPA routes and backend routes are served correctly from one Spring Boot Docker image. The local sandbox blocks Angular compiler reads for source/style files and `node_modules`, so frontend validation commands are run with scoped filesystem access outside the sandbox.
 
 End-to-end browser automation is deferred.
