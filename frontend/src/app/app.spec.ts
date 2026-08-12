@@ -15,6 +15,7 @@ import { workspaceInterceptor } from './core/interceptors/workspace.interceptor'
 import { AuthService } from './core/auth/auth.service';
 import { AuthStateService } from './core/auth/auth-state.service';
 import { WorkspaceStateService } from './core/workspace/workspace-state.service';
+import { SiteExperienceService, DEFAULT_SITE_SETTINGS } from './core/site/site-experience.service';
 import { UrlApi } from './core/api/url-api.service';
 import { AnalyticsApi } from './core/api/analytics-api.service';
 import { ApiKeyApi } from './core/api/api-key-api.service';
@@ -26,6 +27,9 @@ import { invalidTags, normalizeTags } from './shared/utilities/tag-utils';
 import { urlStatePresentation } from './shared/utilities/url-state-presentation';
 import { canCreateApiKeys, canDeleteCampaigns, canManageCampaigns, canManageMembers } from './shared/utilities/workspace-permissions';
 import { safeMetadataEntries } from './shared/utilities/audit-format';
+import { adminGuard } from './core/guards/admin.guard';
+import { AppShell } from './layout/app-shell';
+import { Landing } from './features/public/landing/landing';
 
 const authResponse: AuthResponse = {
   accessToken: 'access-token',
@@ -402,6 +406,118 @@ describe('Stage 9C security utilities', () => {
     expect(canCreateApiKeys('OWNER')).toBe(true);
     expect(canCreateApiKeys('ANALYST')).toBe(false);
     expect(authResponse.user.role).not.toBe('ADMIN');
+  });
+});
+
+describe('Stage 10 site experience frontend', () => {
+  let http: HttpTestingController;
+  let config: RuntimeConfigService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])]
+    });
+    http = TestBed.inject(HttpTestingController);
+    config = TestBed.inject(RuntimeConfigService);
+    (config as unknown as { currentConfig: { set(value: unknown): void } }).currentConfig.set({
+      apiBaseUrl: 'https://api.example.com',
+      publicShortUrlBase: 'https://api.example.com',
+      environment: 'test'
+    });
+  });
+
+  afterEach(() => http.verify());
+
+  it('falls back to compiled branding when the settings API is unavailable', () => {
+    const service = TestBed.inject(SiteExperienceService);
+    service.loadSettings().subscribe((settings) => expect(settings.brandName).toBe(DEFAULT_SITE_SETTINGS.brandName));
+
+    http.expectOne('https://api.example.com/api/v1/site/settings').flush({}, { status: 503, statusText: 'Unavailable' });
+
+    expect(service.brandName()).toBe(DEFAULT_SITE_SETTINGS.brandName);
+  });
+
+  it('loads public pages and filters public announcements by audience', () => {
+    const service = TestBed.inject(SiteExperienceService);
+    service.page('SECURITY').subscribe((page) => expect(page.pageKey).toBe('SECURITY'));
+    http.expectOne('https://api.example.com/api/v1/site/pages/SECURITY').flush({
+      pageKey: 'SECURITY',
+      title: 'Security',
+      summary: 'Controls',
+      content: 'Plain text',
+      publishedAt: null
+    });
+
+    service.announcements('PUBLIC').subscribe((items) => expect(items[0].title).toBe('Notice'));
+    const request = http.expectOne((req) => req.url === 'https://api.example.com/api/v1/site/announcements');
+    expect(request.request.params.get('audience')).toBe('PUBLIC');
+    request.flush([{ id: 'ann-1', title: 'Notice', message: 'Message', severity: 'INFO', audience: 'PUBLIC', enabled: true, dismissible: true, version: 0 }]);
+  });
+
+  it('uses ETags for admin CMS branding updates', () => {
+    const service = TestBed.inject(SiteExperienceService);
+    service.adminSettings().subscribe((resource) => expect(resource.etag).toBe('"4"'));
+    http.expectOne('https://api.example.com/api/v1/admin/site/settings').flush(DEFAULT_SITE_SETTINGS, { headers: { ETag: '"4"' } });
+
+    service.updateSettings(DEFAULT_SITE_SETTINGS, '"4"').subscribe();
+    const update = http.expectOne('https://api.example.com/api/v1/admin/site/settings');
+    expect(update.request.method).toBe('PUT');
+    expect(update.request.headers.get('If-Match')).toBe('"4"');
+    update.flush({ ...DEFAULT_SITE_SETTINGS, brandName: 'Ops Portal' }, { headers: { ETag: '"5"' } });
+  });
+
+  it('renders the public landing page with fallback branding', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [Landing],
+      providers: [
+        provideRouter([]),
+        {
+          provide: SiteExperienceService,
+          useValue: {
+            settings: () => DEFAULT_SITE_SETTINGS,
+            brandName: () => DEFAULT_SITE_SETTINGS.brandName,
+            loadSettings: () => of(DEFAULT_SITE_SETTINGS),
+            announcements: () => of([])
+          }
+        }
+      ]
+    });
+
+    const fixture = TestBed.createComponent(Landing);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain(DEFAULT_SITE_SETTINGS.brandName);
+    expect(fixture.nativeElement.textContent).toContain('Capabilities');
+  });
+
+  it('keeps admin CMS routes guarded and hides platform navigation for normal users', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [AppShell],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: { logout: () => of(null) } },
+        {
+          provide: WorkspaceStateService,
+          useValue: {
+            loading: () => false,
+            selectedWorkspaceId: () => null,
+            workspaces: () => [],
+            select: () => undefined
+          }
+        }
+      ]
+    });
+    const authState = TestBed.inject(AuthStateService);
+    authState.setSession('token', authResponse.user);
+    const guardResult = TestBed.runInInjectionContext(() => adminGuard({} as never, {} as never));
+    expect(guardResult).not.toBe(true);
+
+    const fixture = TestBed.createComponent(AppShell);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Links');
+    expect(fixture.nativeElement.textContent).not.toContain('Experience');
   });
 });
 

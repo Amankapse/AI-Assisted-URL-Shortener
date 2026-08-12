@@ -44,6 +44,7 @@ This directory contains the detailed evidence for the AI-Assisted URL Shortener 
 - [Runtime configuration](frontend/runtime-configuration.md)
 - [Frontend deployment](frontend/deployment.md)
 - [Frontend security](frontend/security.md)
+- [Site experience and CMS](frontend/site-experience-cms.md)
 - [Frontend testing](frontend/testing.md)
 - [User flows](frontend/user-flows.md)
 

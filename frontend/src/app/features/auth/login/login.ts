@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
+import { SiteExperienceService } from '../../../core/site/site-experience.service';
 
 @Component({
   selector: 'app-login',
@@ -14,6 +15,7 @@ export class Login {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  readonly site = inject(SiteExperienceService);
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -21,6 +23,10 @@ export class Login {
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required]]
   });
+
+  constructor() {
+    this.site.loadSettings().subscribe();
+  }
 
   submit(): void {
     this.error.set(null);

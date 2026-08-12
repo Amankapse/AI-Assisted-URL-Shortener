@@ -1,0 +1,49 @@
+<section class="admin-cms">
+  <header>
+    <p class="eyebrow">Platform CMS</p>
+    <h1>Announcements</h1>
+  </header>
+
+  <div class="grid">
+    <aside class="panel list">
+      <button type="button" class="secondary" (click)="clear()">New announcement</button>
+      @for (item of announcements(); track item.id) {
+        <button type="button" class="secondary" (click)="select(item)">
+          {{ item.title }}<br />
+          <small>{{ item.audience }} - {{ item.enabled ? 'Enabled' : 'Disabled' }} - v{{ item.version }}</small>
+        </button>
+      }
+    </aside>
+
+    <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <fieldset>
+        <legend>Announcement</legend>
+        <label>Title <input formControlName="title" /></label>
+        <label>Message <textarea formControlName="message"></textarea></label>
+        <label>Severity
+          <select formControlName="severity">
+            <option value="INFO">Info</option>
+            <option value="NOTICE">Notice</option>
+            <option value="WARNING">Warning</option>
+            <option value="MAINTENANCE">Maintenance</option>
+          </select>
+        </label>
+        <label>Audience
+          <select formControlName="audience">
+            <option value="PUBLIC">Public</option>
+            <option value="AUTHENTICATED">Authenticated</option>
+            <option value="ADMIN">Admin</option>
+          </select>
+        </label>
+        <label>Start <input type="datetime-local" formControlName="startAt" /></label>
+        <label>End <input type="datetime-local" formControlName="endAt" /></label>
+        <label><input type="checkbox" formControlName="enabled" /> Enabled</label>
+        <label><input type="checkbox" formControlName="dismissible" /> Dismissible</label>
+      </fieldset>
+      @if (message()) {
+        <p class="notice" role="status">{{ message() }}</p>
+      }
+      <button type="submit" [disabled]="loading()">Save announcement</button>
+    </form>
+  </div>
+</section>

@@ -1,0 +1,25 @@
+<main class="public-content">
+  <header>
+    <a class="wordmark" routerLink="/">{{ site.brandName() }}</a>
+    <nav aria-label="Public navigation">
+      <a routerLink="/features">Features</a>
+      <a routerLink="/security">Security</a>
+      <a routerLink="/about">About</a>
+      <a routerLink="/login">Sign in</a>
+    </nav>
+  </header>
+
+  @if (page(); as content) {
+    <article>
+      <p class="eyebrow">{{ content.pageKey }}</p>
+      <h1>{{ content.title }}</h1>
+      <p class="summary">{{ content.summary }}</p>
+      <div class="body-text">{{ content.content }}</div>
+    </article>
+  } @else if (failed()) {
+    <article>
+      <h1>Content temporarily unavailable</h1>
+      <p class="summary">The application is still usable. Please try this page again later.</p>
+    </article>
+  }
+</main>

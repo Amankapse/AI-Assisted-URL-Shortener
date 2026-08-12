@@ -13,6 +13,8 @@ This repository contains a production-oriented URL shortener implemented with Ja
 - Workspace-bound machine API keys with scoped access
 - Transactional outbox for durable URL mutation, cache invalidation, and optional analytics delivery
 - Workspace campaigns, normalized tags, and bounded URL search/filtering
+- Public landing page and bounded platform CMS for safe site settings, content pages, announcements, and media metadata
+- Secure first-admin bootstrap through `APP_BOOTSTRAP_ADMIN_EMAIL`
 - RS256 JWT access tokens
 - Rotating opaque refresh tokens stored only as SHA-256 digests
 - Refresh-token reuse detection and token-family revocation
@@ -44,6 +46,7 @@ This repository contains a production-oriented URL shortener implemented with Ja
 - JaCoCo coverage reporting
 - k6 performance scripts
 - Angular 22 frontend with runtime config, auth, workspace shell, link management, analytics, audit, API keys, workspace management, and platform operations
+- Platform administration UI for moderation, audit, outbox visibility, experience settings, public content, announcements, and media metadata
 
 ## Technology Stack
 
@@ -82,6 +85,7 @@ flowchart TB
     App --> Audit[Audit Trail Module]
     App --> ApiKeys[API Key Module]
     App --> Outbox[Transactional Outbox]
+    App --> Site[Site Experience CMS]
     App --> Urls[URL Management]
     App --> Redirect[Redirect Module]
     App --> Analytics[Analytics Module]
@@ -97,6 +101,7 @@ flowchart TB
     Audit --> Postgres
     Outbox --> Postgres
     Outbox --> Redis
+    Site --> Postgres
     RateLimit --> Redis
     Observability --> Metrics[Operational Metrics]
     Browser --> RuntimeConfig[Runtime app-config.json]
@@ -106,7 +111,7 @@ The application is a modular monolith to keep feature boundaries clear without a
 
 Detailed architecture is in [docs/architecture/architecture-overview.md](docs/architecture/architecture-overview.md) and [docs/architecture/transactional-outbox.md](docs/architecture/transactional-outbox.md).
 
-The Angular frontend is source-separated and independently buildable, while the current Render demo packages the Angular build into the Spring Boot Docker image for one public URL. It implements authenticated link management plus enterprise operations: runtime configuration, login/register, memory-only access-token state, refresh single-flight, CSRF propagation, workspace context propagation, guards, interceptors, URL dashboard, create flow, ETag-aware URL details editing, campaign management, URL analytics, audit trails, API-key lifecycle management, workspace/member management, platform analytics, moderation, admin audit, and read-only outbox visibility. QR-code, custom-domain, and tracing UI work remain out of scope. See [docs/frontend/architecture.md](docs/frontend/architecture.md).
+The Angular frontend is source-separated and independently buildable, while the current Render demo packages the Angular build into the Spring Boot Docker image for one public URL. It implements a public landing/content experience plus authenticated link management and enterprise operations: runtime configuration, login/register, memory-only access-token state, refresh single-flight, CSRF propagation, workspace context propagation, guards, interceptors, URL dashboard, create flow, ETag-aware URL details editing, campaign management, URL analytics, audit trails, API-key lifecycle management, workspace/member management, platform analytics, moderation, admin audit, read-only outbox visibility, and bounded CMS administration. QR-code, custom-domain, tracing UI, unrestricted CMS markup, and binary media uploads remain out of scope. See [docs/frontend/architecture.md](docs/frontend/architecture.md) and [docs/frontend/site-experience-cms.md](docs/frontend/site-experience-cms.md).
 
 # Prerequisites
 
@@ -134,6 +139,7 @@ Use [.env.example](.env.example) as a variable-name template only. Do not commit
 | --- | --- | --- | --- |
 | `SPRING_PROFILES_ACTIVE` | Local recommended | Activate local profile | `local` |
 | `APP_PUBLIC_BASE_URL` | Yes for deployed environments | Base URL used to derive `shortUrl` responses | `https://<service>.onrender.com` |
+| `APP_BOOTSTRAP_ADMIN_EMAIL` | Temporary | Promotes one existing registered user to platform `ADMIN` during startup | `<registered-admin-email>` |
 | `SPRING_DATASOURCE_URL` | Yes | PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/shortener` |
 | `SPRING_DATASOURCE_USERNAME` | Yes | Database username | `shortener` |
 | `SPRING_DATASOURCE_PASSWORD` | Yes | Database password | `<database-password>` |

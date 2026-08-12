@@ -1,0 +1,84 @@
+<main class="public-page">
+  <header class="public-nav">
+    <a class="wordmark" routerLink="/">{{ site.brandName() }}</a>
+    <nav aria-label="Public navigation">
+      <a routerLink="/features">Features</a>
+      <a routerLink="/security">Security</a>
+      <a routerLink="/about">About</a>
+      <a routerLink="/help">Help</a>
+    </nav>
+    <div class="nav-actions">
+      <a routerLink="/login">Sign in</a>
+      <a class="primary-link" routerLink="/register">Get started</a>
+    </div>
+  </header>
+
+  @for (announcement of announcements(); track announcement.id) {
+    <aside class="announcement" [class]="announcement.severity.toLowerCase()" aria-live="polite">
+      <strong>{{ announcement.title }}</strong>
+      <span>{{ announcement.message }}</span>
+    </aside>
+  }
+
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Enterprise-ready link operations</p>
+      <h1>{{ site.settings().brandName }}</h1>
+      <p class="lede">{{ site.settings().tagline }}</p>
+      <div class="hero-actions">
+        <a class="button primary" routerLink="/register">Create your workspace</a>
+        <a class="button secondary" routerLink="/security">Review security</a>
+      </div>
+    </div>
+    <div class="hero-panel" aria-label="Operational link workflow preview">
+      <span>Workspace</span>
+      <strong>Campaign launch links</strong>
+      <dl>
+        <div><dt>Ownership</dt><dd>Enforced</dd></div>
+        <div><dt>Cache</dt><dd>Redis + database fallback</dd></div>
+        <div><dt>Audit</dt><dd>Immutable trail</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="band">
+    <h2>Capabilities</h2>
+    <div class="feature-grid">
+      <article><h3>Secure shortening</h3><p>Custom aliases, expirations, blocking, quotas and owner-scoped APIs.</p></article>
+      <article><h3>Team operations</h3><p>Workspaces, RBAC, campaigns, tags, search and API keys for machine clients.</p></article>
+      <article><h3>Observable runtime</h3><p>Actuator health, Micrometer metrics, correlation IDs, rate limits and runbooks.</p></article>
+    </div>
+  </section>
+
+  <section class="workflow">
+    <h2>How it works</h2>
+    <ol>
+      <li><strong>Create</strong><span>Register, sign in and create a managed short link.</span></li>
+      <li><strong>Share</strong><span>Use the public redirect path generated for each short link.</span></li>
+      <li><strong>Govern</strong><span>Review analytics, audit activity and moderation state.</span></li>
+    </ol>
+  </section>
+
+  <section class="trust">
+    <div>
+      <h2>Security and trust</h2>
+      <p>Built with RS256 JWTs, rotating refresh tokens, CSRF protection, role-based access, workspace isolation, API-key scopes, rate limiting and safe RFC7807 responses.</p>
+    </div>
+    <a class="button secondary" routerLink="/help">Read help</a>
+  </section>
+
+  <footer class="public-footer">
+    <p>{{ site.settings().footerDescription }}</p>
+    <nav aria-label="Footer navigation">
+      <a routerLink="/about">About</a>
+      <a routerLink="/security">Security</a>
+      <a routerLink="/help">Help</a>
+      <a routerLink="/contact">Contact</a>
+      <a routerLink="/privacy">Privacy</a>
+      <a routerLink="/terms">Terms</a>
+      <a routerLink="/accessibility">Accessibility</a>
+      <a routerLink="/disclaimer">Disclaimer</a>
+    </nav>
+    <small>{{ site.settings().footerCopyright }}</small>
+  </footer>
+</main>

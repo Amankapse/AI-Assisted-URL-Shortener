@@ -47,6 +47,22 @@ SPRING_PROFILES_ACTIVE=prod
 
 The production profile uses Hibernate schema validation and Flyway migrations. It does not use Hibernate `create`, `create-drop`, or `update`.
 
+## First Platform Administrator
+
+There is no default admin account and no admin password environment variable.
+
+1. Open `https://ai-url-shortener-682u.onrender.com/register`.
+2. Register a normal user with your own email and chosen password.
+3. Confirm that login works.
+4. In Render environment variables set `APP_BOOTSTRAP_ADMIN_EMAIL=<same registered email>`.
+5. Redeploy or restart the Web Service.
+6. The startup runner normalizes the email, finds the existing user, promotes `USER` to platform `ADMIN`, and writes one `ADMIN_PROMOTED` audit event.
+7. Log in with the same email and password.
+8. Verify the Administration navigation under `/app/admin/**`.
+9. Remove `APP_BOOTSTRAP_ADMIN_EMAIL` from Render and redeploy or restart if required.
+
+Repeated restarts are idempotent: an already promoted administrator is left unchanged and no duplicate promotion audit event is written. If the configured email does not match an existing user, startup logs a safe warning and does not create any account.
+
 ## Redis / Valkey
 
 Use the Render Key Value internal connection URL:

@@ -172,7 +172,7 @@ export interface TopLinkResponse {
 }
 
 export type AuditActorType = 'USER' | 'SYSTEM' | 'API_KEY' | 'SERVICE';
-export type AuditResourceType = 'URL' | 'CAMPAIGN' | 'WORKSPACE' | 'WORKSPACE_MEMBER' | 'API_KEY';
+export type AuditResourceType = 'URL' | 'CAMPAIGN' | 'WORKSPACE' | 'WORKSPACE_MEMBER' | 'API_KEY' | 'SITE_SETTINGS' | 'CONTENT_PAGE' | 'ANNOUNCEMENT' | 'MEDIA_ASSET' | 'USER';
 export type AuditAction =
   | 'URL_CREATED'
   | 'URL_DESTINATION_CHANGED'
@@ -189,6 +189,15 @@ export type AuditAction =
   | 'CAMPAIGN_DELETED'
   | 'API_KEY_CREATED'
   | 'API_KEY_REVOKED'
+  | 'SITE_SETTINGS_UPDATED'
+  | 'CONTENT_PAGE_UPDATED'
+  | 'CONTENT_PAGE_PUBLISHED'
+  | 'ANNOUNCEMENT_CREATED'
+  | 'ANNOUNCEMENT_UPDATED'
+  | 'ANNOUNCEMENT_DISABLED'
+  | 'MEDIA_ASSET_REGISTERED'
+  | 'MEDIA_ASSET_UPDATED'
+  | 'ADMIN_PROMOTED'
   | 'WORKSPACE_CREATED'
   | 'WORKSPACE_MEMBER_ADDED'
   | 'WORKSPACE_MEMBER_ROLE_CHANGED'
@@ -277,6 +286,124 @@ export interface OutboxPageResponse {
   content: OutboxEventSummaryResponse[];
   page: number;
   size: number;
+}
+
+export type ContentPageKey = 'ABOUT' | 'FEATURES' | 'SECURITY' | 'HELP' | 'CONTACT' | 'PRIVACY' | 'TERMS' | 'ACCESSIBILITY' | 'DISCLAIMER';
+export type ContentStatus = 'DRAFT' | 'PUBLISHED';
+export type AnnouncementSeverity = 'INFO' | 'NOTICE' | 'WARNING' | 'MAINTENANCE';
+export type AnnouncementAudience = 'PUBLIC' | 'AUTHENTICATED' | 'ADMIN';
+
+export interface PublicMediaAssetResponse {
+  id: string;
+  url: string;
+  altText: string;
+}
+
+export interface SiteSettingsResponse {
+  brandName: string;
+  tagline: string;
+  supportEmail?: string | null;
+  supportUrl?: string | null;
+  contactText?: string | null;
+  logo?: PublicMediaAssetResponse | null;
+  logoDark?: PublicMediaAssetResponse | null;
+  favicon?: PublicMediaAssetResponse | null;
+  loginBackground?: PublicMediaAssetResponse | null;
+  landingHero?: PublicMediaAssetResponse | null;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  footerDescription: string;
+  footerCopyright: string;
+  version: number;
+}
+
+export interface SiteSettingsUpdateRequest {
+  brandName: string;
+  tagline: string;
+  supportEmail?: string | null;
+  supportUrl?: string | null;
+  contactText?: string | null;
+  logoAssetId?: string | null;
+  logoDarkAssetId?: string | null;
+  faviconAssetId?: string | null;
+  loginBackgroundAssetId?: string | null;
+  landingHeroAssetId?: string | null;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  footerDescription: string;
+  footerCopyright: string;
+}
+
+export interface PublicContentPageResponse {
+  pageKey: ContentPageKey;
+  title: string;
+  summary: string;
+  content: string;
+  publishedAt?: string | null;
+}
+
+export interface AdminContentPageResponse extends PublicContentPageResponse {
+  id: string;
+  status: ContentStatus;
+  version: number;
+  updatedAt: string;
+}
+
+export interface ContentPageUpdateRequest {
+  title: string;
+  summary: string;
+  content: string;
+  status: ContentStatus;
+}
+
+export interface AnnouncementResponse {
+  id: string;
+  title: string;
+  message: string;
+  severity: AnnouncementSeverity;
+  audience: AnnouncementAudience;
+  enabled: boolean;
+  startAt?: string | null;
+  endAt?: string | null;
+  dismissible: boolean;
+  version: number;
+}
+
+export interface AnnouncementRequest {
+  title: string;
+  message: string;
+  severity: AnnouncementSeverity;
+  audience: AnnouncementAudience;
+  enabled: boolean;
+  startAt?: string | null;
+  endAt?: string | null;
+  dismissible: boolean;
+}
+
+export interface MediaAssetResponse {
+  id: string;
+  name: string;
+  url: string;
+  altText: string;
+  sourceName?: string | null;
+  sourceUrl?: string | null;
+  license?: string | null;
+  attribution?: string | null;
+  enabled: boolean;
+  version: number;
+}
+
+export interface MediaAssetRequest {
+  name: string;
+  url: string;
+  altText: string;
+  sourceName?: string | null;
+  sourceUrl?: string | null;
+  license?: string | null;
+  attribution?: string | null;
+  enabled: boolean;
 }
 
 export interface OutboxSearchParams {

@@ -1,0 +1,48 @@
+<section class="admin-cms">
+  <header>
+    <p class="eyebrow">Platform CMS</p>
+    <h1>Experience</h1>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <fieldset>
+      <legend>Brand identity</legend>
+      <label>Brand name <input formControlName="brandName" /></label>
+      <label>Tagline <input formControlName="tagline" /></label>
+      <label>Support email <input type="email" formControlName="supportEmail" /></label>
+      <label>Support URL <input formControlName="supportUrl" /></label>
+      <label>Contact text <textarea formControlName="contactText"></textarea></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Colors</legend>
+      <label>Primary <input type="text" formControlName="primaryColor" /></label>
+      <label>Secondary <input type="text" formControlName="secondaryColor" /></label>
+      <label>Accent <input type="text" formControlName="accentColor" /></label>
+      <div class="preview" [style.--preview-brand]="form.controls.primaryColor.value">
+        <strong>{{ form.controls.brandName.value || 'Brand preview' }}</strong>
+        <span>{{ form.controls.tagline.value || 'Accessible colors are validated on save.' }}</span>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Media asset references</legend>
+      <label>Logo asset ID <input formControlName="logoAssetId" /></label>
+      <label>Dark logo asset ID <input formControlName="logoDarkAssetId" /></label>
+      <label>Favicon asset ID <input formControlName="faviconAssetId" /></label>
+      <label>Auth background asset ID <input formControlName="loginBackgroundAssetId" /></label>
+      <label>Landing hero asset ID <input formControlName="landingHeroAssetId" /></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Footer</legend>
+      <label>Description <textarea formControlName="footerDescription"></textarea></label>
+      <label>Copyright <input formControlName="footerCopyright" /></label>
+    </fieldset>
+
+    @if (message()) {
+      <p class="notice" role="status">{{ message() }}</p>
+    }
+    <button type="submit" [disabled]="loading()">{{ loading() ? 'Saving...' : 'Save settings' }}</button>
+  </form>
+</section>

@@ -1,0 +1,44 @@
+<section class="admin-cms">
+  <header>
+    <p class="eyebrow">Platform CMS</p>
+    <h1>Content</h1>
+  </header>
+
+  <div class="grid">
+    <aside class="panel list">
+      @for (page of pages(); track page.id) {
+        <button type="button" class="secondary" (click)="select(page)">
+          {{ page.pageKey }}<br />
+          <small>{{ page.status }} - v{{ page.version }}</small>
+        </button>
+      }
+    </aside>
+
+    <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <fieldset>
+        <legend>Page editor</legend>
+        <label>Title <input formControlName="title" /></label>
+        <label>Summary <textarea formControlName="summary"></textarea></label>
+        <label>Content <textarea formControlName="content"></textarea></label>
+        <label>Status
+          <select formControlName="status">
+            <option value="DRAFT">Draft</option>
+            <option value="PUBLISHED">Published</option>
+          </select>
+        </label>
+      </fieldset>
+
+      <section class="panel">
+        <h2>Preview</h2>
+        <strong>{{ form.controls.title.value }}</strong>
+        <p>{{ form.controls.summary.value }}</p>
+        <div class="body-preview">{{ form.controls.content.value }}</div>
+      </section>
+
+      @if (message()) {
+        <p class="notice" role="status">{{ message() }}</p>
+      }
+      <button type="submit" [disabled]="loading()">Save page</button>
+    </form>
+  </div>
+</section>

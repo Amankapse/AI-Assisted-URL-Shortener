@@ -1,19 +1,77 @@
-.topbar {
-  align-items: center;
-  background: #102033;
+.app-shell {
+  display: grid;
+  grid-template-columns: 17rem minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.rail {
+  background: #123047;
   color: #f8fafc;
   display: flex;
-  gap: 1rem;
-  justify-content: space-between;
-  min-height: 4rem;
-  padding: 0 1.5rem;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.25rem 1rem;
 }
 
 .brand {
   color: inherit;
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   font-weight: 700;
+  padding: 0.5rem 0.65rem;
   text-decoration: none;
+}
+
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.nav-label {
+  color: #a7c7df;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  padding: 0 0.65rem;
+  text-transform: uppercase;
+}
+
+nav a {
+  border-radius: 8px;
+  color: #e2edf6;
+  padding: 0.65rem;
+  text-decoration: none;
+}
+
+nav a.active,
+nav a:hover {
+  background: #1b4b6a;
+  color: #ffffff;
+}
+
+.workspace {
+  min-width: 0;
+}
+
+.topbar {
+  align-items: center;
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  min-height: 4.25rem;
+  padding: 0 1.5rem;
+}
+
+.topbar div:first-child {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.topbar span {
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }
 
 .session {
@@ -22,29 +80,9 @@
   gap: 0.75rem;
 }
 
-nav {
-  align-items: center;
-  display: flex;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-}
-
-nav a {
-  border-radius: 8px;
-  color: #dbeafe;
-  padding: 0.55rem 0.7rem;
-  text-decoration: none;
-}
-
-nav a.active,
-nav a:hover {
-  background: #1f3b57;
-  color: #ffffff;
-}
-
 select,
 button {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-default);
   border-radius: 8px;
   font: inherit;
   min-height: 2.35rem;
@@ -52,18 +90,27 @@ button {
 }
 
 button {
-  background: #f8fafc;
-  color: #102033;
+  background: var(--surface-card);
+  color: var(--text-primary);
   cursor: pointer;
 }
 
 .shell-main {
   margin: 0 auto;
-  max-width: 72rem;
+  max-width: 78rem;
   padding: 2rem 1.5rem;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 860px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
   .topbar,
   .session {
     align-items: stretch;
@@ -72,9 +119,5 @@ button {
 
   .topbar {
     padding: 1rem;
-  }
-
-  nav {
-    flex-wrap: wrap;
   }
 }

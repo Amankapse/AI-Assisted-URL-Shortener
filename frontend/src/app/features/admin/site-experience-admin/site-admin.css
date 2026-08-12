@@ -1,0 +1,120 @@
+.admin-cms {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.eyebrow {
+  color: var(--color-accent);
+  font-weight: 800;
+  margin: 0 0 0.25rem;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+}
+
+form,
+.panel {
+  display: grid;
+  gap: 1rem;
+}
+
+fieldset,
+.panel {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+legend {
+  font-weight: 800;
+}
+
+label {
+  color: var(--text-secondary);
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 650;
+}
+
+input,
+select,
+textarea {
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  font: inherit;
+  min-height: 2.4rem;
+  padding: 0.55rem 0.7rem;
+}
+
+textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+button {
+  background: var(--color-brand);
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  min-height: 2.6rem;
+  padding: 0 1rem;
+  width: fit-content;
+}
+
+button.secondary {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+}
+
+.notice {
+  color: var(--state-info);
+  margin: 0;
+}
+
+.preview {
+  background: var(--preview-brand, var(--color-brand));
+  border-radius: 8px;
+  color: #ffffff;
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 18rem minmax(0, 1fr);
+}
+
+.list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.list button {
+  text-align: left;
+  width: 100%;
+}
+
+.body-preview {
+  background: var(--surface-elevated);
+  border-radius: 8px;
+  line-height: 1.6;
+  padding: 1rem;
+  white-space: pre-line;
+}
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

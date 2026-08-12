@@ -25,6 +25,7 @@ Use placeholders only in documentation and committed files. Configure real value
 | `APP_AUTH_REFRESH_TOKEN_TTL` | No | No | Refresh-token lifetime | `14d` |
 | `APP_AUTH_SECURE_COOKIES` | Yes | No | Secure refresh-cookie flag for HTTPS production | `true` |
 | `APP_AUTH_ALLOWED_ORIGINS` | Yes | No | Explicit CORS allowlist for external clients/future split frontend; same-origin Angular does not depend on CORS | `https://ai-url-shortener-682u.onrender.com` |
+| `APP_BOOTSTRAP_ADMIN_EMAIL` | Temporary | No | Promotes one existing registered user to platform `ADMIN` during startup; remove after promotion | `<registered-admin-email>` |
 | `APP_ANALYTICS_IP_HASH_PEPPER` | Yes | Yes | HMAC pepper for IP anonymization | `<STRONG_RANDOM_SECRET>` |
 | `APP_ANALYTICS_PUBLISHER` | No | No | Analytics publisher mode: `local` or `outbox`; defaults to `local` | `local` |
 | `APP_ANALYTICS_QUEUE_CAPACITY` | No | No | Analytics queue capacity | `1000` |

@@ -85,11 +85,22 @@ public class SecurityConfig {
                                 "/media/**",
                                 "/login",
                                 "/register",
+                                "/features",
+                                "/security",
+                                "/about",
+                                "/help",
+                                "/contact",
+                                "/privacy",
+                                "/terms",
+                                "/accessibility",
+                                "/disclaimer",
                                 "/app",
                                 "/app/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/site/settings", "/api/v1/site/pages/**", "/api/v1/site/announcements").permitAll()
                         .requestMatchers(HttpMethod.GET, "/r/{shortCode}", "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness", "/actuator/info", "/v3/api-docs", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/metrics", "/actuator/metrics/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/admin/site/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/analytics/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/audit/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/outbox/**").hasRole("ADMIN")

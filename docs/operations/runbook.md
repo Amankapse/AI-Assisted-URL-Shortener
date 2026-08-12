@@ -14,6 +14,7 @@ Prerequisites:
 - `APP_AUDIT_METADATA_MAX_BYTES` and `APP_AUDIT_RETENTION` reviewed for the environment
 - `APP_OUTBOX_*` dispatcher, retry, payload, and retention settings reviewed for the environment
 - `SHORTENER_CODE_LENGTH`, `SHORTENER_CODE_MAX_RETRIES`, and quota settings reviewed for the environment
+- Optional first-admin bootstrap `APP_BOOTSTRAP_ADMIN_EMAIL` used only for one existing registered user, then removed
 - Angular public runtime config values set for the packaged Web Service:
   `FRONTEND_API_BASE_URL`, `FRONTEND_PUBLIC_SHORT_URL_BASE`, and `FRONTEND_ENVIRONMENT`
 
@@ -25,7 +26,7 @@ docker compose up -d postgres redis
 
 Start the application with the required datasource, Redis, JWT, analytics, and rate-limit environment variables. Flyway runs on startup and applies forward-only migrations.
 
-Current migrations are V1 through V10. V7 adds append-only application-level audit events with bounded JSONB metadata. V8 adds workspace-bound API keys and expands audit constraints for API-key create/revoke events. V9 adds transactional outbox events. V10 adds campaigns, tags, URL tag assignments, and search/filter indexes. Audit rows intentionally avoid cascading foreign keys so records survive user, URL, and workspace lifecycle changes.
+Current migrations are V1 through V11. V7 adds append-only application-level audit events with bounded JSONB metadata. V8 adds workspace-bound API keys and expands audit constraints for API-key create/revoke events. V9 adds transactional outbox events. V10 adds campaigns, tags, URL tag assignments, and search/filter indexes. V11 adds bounded site settings, content pages, announcements, media asset metadata, and CMS audit constraint updates. Audit rows intentionally avoid cascading foreign keys so records survive user, URL, workspace, and CMS content lifecycle changes.
 
 ## API latency increase
 
@@ -153,6 +154,24 @@ Investigate:
 - Browser network requests target `/api/v1/...`, not `localhost` or an internal Render URL.
 - Direct Angular routes reload successfully through Spring MVC SPA forwarding.
 - Health check remains `/actuator/health/liveness`, not `/`.
+
+## Site experience or CMS issue
+
+Expected behavior:
+
+- Public `/api/v1/site/**` reads expose only safe published content.
+- Platform-admin CMS APIs under `/api/v1/admin/site/**` require `ROLE_ADMIN`; workspace admins and API keys are not sufficient.
+- CMS content is plain text/structured text and must not be rendered as raw HTML.
+- Media assets are HTTPS URL metadata only; Stage 10 rejects SVG URLs.
+- Redirects under `/r/{shortCode}` do not query CMS tables or APIs.
+- `APP_BOOTSTRAP_ADMIN_EMAIL` promotes only an existing registered user and should be removed after successful promotion.
+
+Investigate:
+
+- CMS update failures caused by stale `If-Match` versions.
+- `SITE_SETTINGS_UPDATED`, `CONTENT_PAGE_*`, `ANNOUNCEMENT_*`, `MEDIA_ASSET_*`, and `ADMIN_PROMOTED` audit events.
+- Public content status and announcement audience/date filters.
+- Missing external media or mixed-content browser blocking for administrator-provided asset URLs.
 
 ## CORS, cookie, or CSRF issue
 

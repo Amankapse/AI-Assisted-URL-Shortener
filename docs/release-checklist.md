@@ -17,11 +17,11 @@
 
 ## Evidence
 
-- [x] Backend test count recorded after amendment: 120
-- [x] Frontend test count recorded: 22
-- [x] JaCoCo line/branch coverage recorded: 85.13% / 60.90%
-- [x] Angular bundle size recorded: 103.64 kB raw / 26.69 kB estimated transfer
-- [x] Flyway V1-V10 validation recorded
+- [x] Backend test count recorded after Stage 10: 125
+- [x] Frontend test count recorded after Stage 10: 28
+- [x] JaCoCo line/branch coverage recorded: 85.07% / 60.15%
+- [x] Angular bundle size recorded: 107.57 kB raw / 28.00 kB estimated transfer
+- [x] Flyway V1-V11 validation recorded
 - [x] PostgreSQL Testcontainers evidence recorded
 - [x] Redis Testcontainers evidence recorded
 - [x] Docker Compose validation recorded
@@ -55,6 +55,8 @@
 - [x] Frontend build scanned for secret markers
 - [ ] API-key one-time display validated
 - [ ] Sensitive endpoint cache behavior reviewed
+- [x] No public admin-promotion endpoint or admin password bootstrap added
+- [x] Bounded CMS content renders as text, not raw HTML
 
 ## Operations
 

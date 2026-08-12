@@ -43,6 +43,8 @@ management:
 
 app:
   public-base-url: ${APP_PUBLIC_BASE_URL}
+  bootstrap:
+    admin-email: ${APP_BOOTSTRAP_ADMIN_EMAIL:}
   auth:
     issuer: ${APP_AUTH_ISSUER}
     audience: ${APP_AUTH_AUDIENCE}
