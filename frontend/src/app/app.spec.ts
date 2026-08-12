@@ -3,8 +3,9 @@ import { provideHttpClientTesting, HttpTestingController } from '@angular/common
 import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { Observable, Subject } from 'rxjs';
+import { Observable, of, Subject } from 'rxjs';
 import { App } from './app';
+import { initializeApplication } from './app.config';
 import { AuthApi } from './core/api/auth-api.service';
 import { AuthResponse, ShortUrlResponse, WorkspaceResponse } from './core/api/api-types';
 import { RuntimeConfigService } from './core/config/runtime-config.service';
@@ -107,6 +108,40 @@ describe('RuntimeConfigService', () => {
     });
 
     await expect(promise).rejects.toThrow(/apiBaseUrl/);
+  });
+});
+
+describe('application initializer', () => {
+  it('keeps dependency injection synchronous across async startup work', async () => {
+    let configLoaded = false;
+    let authInitialized = false;
+
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: RuntimeConfigService,
+          useValue: {
+            load: () => Promise.resolve().then(() => {
+              configLoaded = true;
+            })
+          }
+        },
+        {
+          provide: AuthService,
+          useValue: {
+            initialize: () => {
+              authInitialized = true;
+              return of(null);
+            }
+          }
+        }
+      ]
+    });
+
+    await expect(TestBed.runInInjectionContext(() => initializeApplication())).resolves.toBeUndefined();
+
+    expect(configLoaded).toBe(true);
+    expect(authInitialized).toBe(true);
   });
 });
 

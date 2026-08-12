@@ -10,10 +10,13 @@ import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { workspaceInterceptor } from './core/interceptors/workspace.interceptor';
 
-async function initializeApplication(): Promise<void> {
+export function initializeApplication(): Promise<void> {
   const runtimeConfig = inject(RuntimeConfigService);
-  await runtimeConfig.load();
-  await firstValueFrom(inject(AuthService).initialize());
+  const auth = inject(AuthService);
+
+  return runtimeConfig.load()
+    .then(() => firstValueFrom(auth.initialize()))
+    .then(() => undefined);
 }
 
 export const appConfig: ApplicationConfig = {

@@ -804,3 +804,40 @@ The initial diagnosis treated the delete order as suspicious, but the order was 
 ### Rejected
 
 Adding sleeps, disabling analytics globally, changing the `click_events` foreign key, adding cascade deletes, or weakening redirect analytics behavior were rejected as broader and less deterministic than the test cleanup fix.
+
+## P-034 Production Angular NG0203 Blank-Page Regression
+
+- Scope: fix the production Angular blank-page regression only.
+- Observed failure:
+  - Combined Spring Boot and Angular packaging served `/`, `/login`, JS/CSS, and `/app-config.json`.
+  - Browser bootstrap failed with Angular `NG0203: inject() must be called from an injection context`.
+- Root cause:
+  - `frontend/src/app/app.config.ts` defined `initializeApplication()` as an `async` function.
+  - It called `inject(RuntimeConfigService)` synchronously, then awaited `runtimeConfig.load()`, then called `inject(AuthService)` after the async boundary.
+  - Angular's initializer injection context is only valid for synchronous dependency resolution, so the post-`await` `inject(AuthService)` caused NG0203.
+- Correction:
+  - Exported `initializeApplication()` for testing.
+  - Resolved both `RuntimeConfigService` and `AuthService` synchronously before returning the async startup chain.
+  - Kept `RuntimeConfigService` dependency resolution in injectable field initializers.
+  - Added an initializer regression test using `TestBed.runInInjectionContext()` and an async `RuntimeConfigService.load()` mock so the test would fail if DI moved after the async boundary again.
+- Validation:
+  - Static `inject()` search confirmed the initializer no longer calls `inject()` after `await`; guards/interceptors resolve dependencies at the beginning of Angular-invoked functions.
+  - `.\mvnw.cmd clean verify` passed with 120 backend tests and JaCoCo line 85.13% / branch 60.90%.
+  - `docker build -t url-shortener-fullstack .` passed; Docker executed `npm run build:render`, producing initial Angular bundle 103.66 kB raw / 26.68 kB transfer.
+  - Local packaged-image smoke with `PORT=10000` passed for `/`, `/login`, `/register`, `/app/urls`, `/api/v1/auth/me`, `/actuator/health/liveness`, and `/app-config.json`.
+  - Generated production app config values: `apiBaseUrl` empty string, `publicShortUrlBase` `https://ai-url-shortener-682u.onrender.com`, `environment` `production`.
+  - Direct `npm test -- --watch=false` in this sandbox failed because Angular compiler access to frontend source/style files and `node_modules` was denied; an escalated retry was rejected by the approval reviewer. Browser-console validation was not performed because no local Chrome, Chromium, Edge, Chromedriver, or Playwright browser install is available in this environment.
+
+## P-034 AI Output Examples
+
+### Accepted
+
+Resolving all initializer dependencies synchronously and returning a Promise chain was accepted because it matches Angular's DI rules without changing application behavior.
+
+### Edited
+
+The regression test was focused on `initializeApplication()` under `TestBed.runInInjectionContext()` rather than broad component rendering, so it specifically protects the NG0203 failure mode.
+
+### Rejected
+
+Backend route changes, hash routing, CORS/cookie changes, Docker architecture changes, and moving authentication startup out of the Angular initializer were rejected as outside the blank-page regression scope.

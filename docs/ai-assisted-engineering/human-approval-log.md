@@ -183,3 +183,10 @@ This log records explicit approvals for decisions that affect architecture, secu
 - Decision: accepted a test-only cleanup correction that flushes the existing local analytics publisher before deleting dependent tables.
 - Rejected alternatives: sleeps, global analytics disabling, production FK/cascade changes, and redirect analytics behavior changes.
 - Validation: focused `.\mvnw.cmd -q "-Dtest=ApiKeyIntegrationTests" test` passed; full `.\mvnw.cmd clean verify` passed with 120 tests and JaCoCo line 85.13% / branch 60.90%; PostgreSQL and Redis Testcontainers started; Flyway V1-V10 validated/applied; Hibernate schema validation succeeded; `docker compose config` passed.
+
+## Production Angular NG0203 Blank-Page Regression
+
+- Approved scope: fix production Angular blank-page regression only.
+- Decision: accepted a frontend-only initializer fix that resolves all Angular dependencies synchronously before asynchronous startup work.
+- Rejected alternatives: backend route/security changes, hash routing, CORS/cookie changes, Docker architecture changes, and new product behavior.
+- Validation: static `inject()` inspection identified `app.config.ts` as the NG0203 source and confirmed the corrected initializer resolves dependencies before async boundaries; `.\mvnw.cmd clean verify` passed with 120 backend tests and JaCoCo line 85.13% / branch 60.90%; `docker build -t url-shortener-fullstack .` passed and ran `npm run build:render`; packaged-image smoke with `PORT=10000` passed. Direct frontend `npm test -- --watch=false` and browser-console validation could not be completed in this environment because sandbox approval for Angular compiler access was rejected and no local browser automation binary was available.
